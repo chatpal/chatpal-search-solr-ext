@@ -68,12 +68,13 @@ public class ChatpalPingRequestHandler extends PingRequestHandler {
 
         query.set("json.facet", String.format("{%s:'min(%s)', %s:'max(%s)'}", VALUE_OLDEST, FIELD_AGE, VALUE_NEWEST, FIELD_AGE));
 
-        final LocalSolrQueryRequest localRequest = new LocalSolrQueryRequest(req.getCore(), query);
-        final SolrQueryResponse response = new SolrQueryResponse();
+        try (LocalSolrQueryRequest localRequest = new LocalSolrQueryRequest(req.getCore(), query)) {
+            final SolrQueryResponse response = new SolrQueryResponse();
 
-        // TODO: maybe we need a concrete handler here? Such as '/select'?
-        req.getCore().getRequestHandler(null).handleRequest(localRequest, response);
+            // TODO: maybe we need a concrete handler here? Such as '/select'?
+            req.getCore().getRequestHandler(null).handleRequest(localRequest, response);
 
-        return response.getValues().get("facets");
+            return response.getValues().get("facets");
+        }
     }
 }

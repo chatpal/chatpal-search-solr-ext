@@ -95,7 +95,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
         // Type specific adaptions
         for (QueryAdapter adapter : queryAdapter) {
-            adapter.adaptQuery(query,req, rsp, docType);
+            adapter.adaptQuery(query, req, rsp, docType);
         }
 
         // param hierarchy
@@ -112,11 +112,12 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
         logger.debug("Chatpal query: {}", defaultedQuery);
 
-        final LocalSolrQueryRequest userRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery);
-        final SolrQueryResponse response = new SolrQueryResponse();
-        super.handleRequestBody(userRequest, response);
+        try (LocalSolrQueryRequest subRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery)) {
+            final SolrQueryResponse response = new SolrQueryResponse();
+            super.handleRequestBody(subRequest, response);
 
-        rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+            rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+        }
     }
 
     private boolean typeFilterAccepts(SolrQueryRequest req, DocType type) {

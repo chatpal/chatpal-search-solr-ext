@@ -51,7 +51,7 @@ public class SuggestionRequestHandler extends SearchHandler {
 
         String text = req.getParams().get(ChatpalParams.PARAM_TEXT);
 
-        if(StringUtils.isEmpty(text)) {
+        if (StringUtils.isEmpty(text)) {
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, Collections.emptyList());
             return;
         }
@@ -65,17 +65,17 @@ public class SuggestionRequestHandler extends SearchHandler {
 
         //set filter for type
         String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
-        if(typeParams != null) {
+        if (typeParams != null) {
             String types = String.join(" OR ", typeParams);
             params.add(CommonParams.FQ, ChatpalParams.FIELD_TYPE + ":(" + types + ")");
         }
 
         List<String> tokens = Stream.of(text.split(" ")).map(String::toLowerCase).collect(Collectors.toList());
 
-        if(text.endsWith(" ")) {
+        if (text.endsWith(" ")) {
             text = null;
         } else {
-            text = tokens.remove(tokens.size()-1);
+            text = tokens.remove(tokens.size() - 1);
         }
 
         tokens.forEach(t -> params.add(CommonParams.FQ, ChatpalParams.FIELD_SUGGESTION + ":" + t));
@@ -85,33 +85,34 @@ public class SuggestionRequestHandler extends SearchHandler {
 
         //logger.info("suggestion query: {}", params);
 
-        final LocalSolrQueryRequest userRequest = new LocalSolrQueryRequest(req.getCore(), params);
-        final SolrQueryResponse response = new SolrQueryResponse();
+        try (LocalSolrQueryRequest userRequest = new LocalSolrQueryRequest(req.getCore(), params)) {
+            final SolrQueryResponse response = new SolrQueryResponse();
 
-        super.handleRequestBody(userRequest, response);
-        //build response
-        Iterator<Map.Entry> entries = ((NamedList)((SimpleOrderedMap)((SimpleOrderedMap)response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
+            super.handleRequestBody(userRequest, response);
+            //build response
+            Iterator<Map.Entry> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
 
-        ArrayList<Map> suggestions = new ArrayList<>();
+            ArrayList<Map> suggestions = new ArrayList<>();
 
-        String prefix = tokens.stream().collect(Collectors.joining(" "));
+            String prefix = tokens.stream().collect(Collectors.joining(" "));
 
-        if(prefix.length() > 0 ) prefix += " ";
+            if (prefix.length() > 0) prefix += " ";
 
-        while(entries.hasNext()) {
+            while (entries.hasNext()) {
 
-            Map.Entry entry = entries.next();
-            if(!tokens.contains(entry.getKey())) {
-                suggestions.add(ImmutableMap.of(
-                        "text", prefix + entry.getKey(),
-                        "count", entry.getValue()
-                ));
+                Map.Entry entry = entries.next();
+                if (!tokens.contains(entry.getKey())) {
+                    suggestions.add(ImmutableMap.of(
+                            "text", prefix + entry.getKey(),
+                            "count", entry.getValue()
+                    ));
+                }
+
+                if (suggestions.size() == MAX_SIZE) break;
             }
 
-            if(suggestions.size() == MAX_SIZE) break;
+            rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
         }
-
-        rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
     }
 
     private void appendACLFilter(ModifiableSolrParams query, SolrQueryRequest req) {
