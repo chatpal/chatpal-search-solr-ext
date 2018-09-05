@@ -1,19 +1,15 @@
 package io.chatpal.solr.ext.logging;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.solr.common.util.NamedList;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public class JsonLogMessage {
 
@@ -22,6 +18,8 @@ public class JsonLogMessage {
     static {
         mapper.setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
     }
+
+    private JsonLogMessage() {}
 
     public static QueryLog queryLog() {
         return new QueryLog();
@@ -35,7 +33,7 @@ public class JsonLogMessage {
         return new IndexLog();
     }
 
-    public static abstract class Log {
+    public abstract static class Log {
 
         @JsonProperty("type")
         public abstract String getType();
@@ -48,7 +46,7 @@ public class JsonLogMessage {
             return this;
         }
 
-        public class Client {
+        public static class Client {
             private String collection;
 
             protected Client(String collection) {
@@ -167,8 +165,8 @@ public class JsonLogMessage {
         }
 
         public IndexLog setStats(Map<String, Object> stats) {
-            for(String name: stats.keySet()) {
-                this.stats.put(name, Collections.singletonMap("count",((NamedList) stats.get(name)).get("count")));
+            for(Map.Entry<String, Object> entry: stats.entrySet()) {
+                this.stats.put(entry.getKey(), Collections.singletonMap("count", ((NamedList) entry.getValue()).get("count")));
             }
             return this;
         }

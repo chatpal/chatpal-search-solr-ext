@@ -14,12 +14,12 @@
  * limitations under the License.
  *
  */
-
 package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
@@ -48,10 +48,11 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
-    private Logger elasticLogger = LoggerFactory.getLogger("elasticLogger");
+    private ReportingLogger reporting = ReportingLogger.getInstance();
 
     private static final int MAX_SIZE = 10;
 
+    @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
 
         long start = System.currentTimeMillis();
@@ -122,11 +123,10 @@ public class SuggestionRequestHandler extends SearchHandler {
 
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
 
-            elasticLogger.info(JsonLogMessage.suggestionLog()
+            reporting.logSuggestion(JsonLogMessage.suggestionLog()
                     .setClient(req.getCore().getName())
                     .setSearchTerm(text)
-                    .setQueryTime(System.currentTimeMillis() - start)
-                    .toJsonString());
+                    .setQueryTime(System.currentTimeMillis() - start));
         }
     }
 
