@@ -1,6 +1,6 @@
 ## Solr Logging
 
-The Chatpal request handler logs information in Json Format on every request, like:
+The Chatpal request handler logs information in JSON Format on every request, like:
 ```json
 {  
    "data":{  
@@ -18,7 +18,7 @@ The Chatpal request handler logs information in Json Format on every request, li
    }
 }
 ```
-Fro suggestion it looks like:
+For suggestion it looks like:
 ````json
 {  
    "data":{  
