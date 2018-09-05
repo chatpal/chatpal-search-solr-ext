@@ -18,6 +18,7 @@ package io.chatpal.solr.ext.handler;
 
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.DocType;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
@@ -44,6 +45,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
 
+    private Logger elasticLogger = LoggerFactory.getLogger("elasticLogger");
+
     private Map<DocType, SolrParams> defaultParams = new EnumMap<>(DocType.class);
 
     @Override
@@ -59,13 +62,35 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     @Override
     public void handleRequestBody(SolrQueryRequest originalReq, SolrQueryResponse rsp) throws Exception {
-        queryFor(DocType.Message, originalReq, rsp, this::appendACLFilter);
-        queryFor(DocType.Room, originalReq, rsp, this::appendACLFilter);
-        queryFor(DocType.User, originalReq, rsp);
+        long start = System.currentTimeMillis();
+
+        Loggable msgLog = queryFor(DocType.Message, originalReq, rsp, this::appendACLFilter);
+        Loggable roomLog = queryFor(DocType.Room, originalReq, rsp, this::appendACLFilter);
+        Loggable userLog = queryFor(DocType.User, originalReq, rsp);
+
+        JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
+                .setClient(originalReq.getCore().getName())
+                .setSearchTerm(originalReq.getParams().get(ChatpalParams.PARAM_TEXT));
+
+        if(msgLog != null) {
+            log.setResultSize(DocType.Message.getKey(), msgLog.numFound);
+        }
+
+        if(roomLog != null) {
+            log.setResultSize(DocType.Message.getKey(), roomLog.numFound);
+        }
+
+        if(userLog != null) {
+            log.setResultSize(DocType.Message.getKey(), userLog.numFound);
+        }
+
+        log.setQueryTime(System.currentTimeMillis() - start);
+
+        elasticLogger.info(log.toJsonString());
     }
 
-    private void queryFor(DocType docType, SolrQueryRequest req, SolrQueryResponse rsp, QueryAdapter... queryAdapter) throws Exception {
-        if (!typeFilterAccepts(req, docType)) return;
+    private Loggable queryFor(DocType docType, SolrQueryRequest req, SolrQueryResponse rsp, QueryAdapter... queryAdapter) throws Exception {
+        if (!typeFilterAccepts(req, docType)) return null;
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
@@ -117,6 +142,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             super.handleRequestBody(subRequest, response);
 
             rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+
+            return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
     }
 
@@ -239,5 +266,13 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private interface QueryAdapter {
         void adaptQuery(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType);
+    }
+
+    class Loggable {
+        long numFound;
+
+        public Loggable(long numFound) {
+            this.numFound = numFound;
+        }
     }
 }

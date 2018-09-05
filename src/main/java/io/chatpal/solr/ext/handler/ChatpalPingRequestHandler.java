@@ -17,18 +17,25 @@
 package io.chatpal.solr.ext.handler;
 
 import io.chatpal.solr.ext.DocType;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.PingRequestHandler;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.util.plugin.SolrCoreAware;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ChatpalPingRequestHandler extends PingRequestHandler {
+public class ChatpalPingRequestHandler extends PingRequestHandler implements SolrCoreAware {
+
+    private Logger elasticLogger = LoggerFactory.getLogger("elasticLogger");
 
     private static final String PARAM_STATS = "stats";
     private static final String PARAM_SCHEMA_VERSION = "schemaVersion";
@@ -37,6 +44,14 @@ public class ChatpalPingRequestHandler extends PingRequestHandler {
     private static final String VALUE_OLDEST = "oldest";
 
     private static final String FIELD_AGE = "created";
+
+    private SolrCore core;
+
+    @Override
+    public void inform(SolrCore core) {
+        super.inform(core);
+        this.core = core;
+    }
 
     @Override
     protected void handlePing(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
@@ -55,6 +70,8 @@ public class ChatpalPingRequestHandler extends PingRequestHandler {
             stats.put(DocType.User.getKey(), getStats(DocType.User.getIndexVal(), req));
 
             rsp.add(PARAM_STATS, stats);
+
+            elasticLogger.info(JsonLogMessage.indexLog().setClient(this.core.getName()).setStats(stats).toJsonString());
         }
 
     }
