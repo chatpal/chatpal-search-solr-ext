@@ -120,18 +120,7 @@ public class SuggestionRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildOrFilter(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
     }
 
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
-
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
-    }
 }

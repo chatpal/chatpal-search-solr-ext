@@ -221,32 +221,10 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildTermsQuery(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
     }
 
-    private String buildTermsQuery(SolrParams solrParams, String param, String field){
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
-        return String.format("{!terms f=%s}", field) +
-                Arrays.stream(values)
-                        .filter(StringUtils::isNoneBlank)
-                        .collect(Collectors.joining(","));
-    }
-    
-    @SuppressWarnings("unused")
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
 
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
-    }
 
     private interface QueryAdapter {
         void adaptQuery(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType);
