@@ -19,8 +19,6 @@ package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
-import io.chatpal.solr.ext.DocType;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
@@ -45,6 +43,7 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private static final int MAX_SIZE = 10;
 
+    @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
 
         ModifiableSolrParams params = new ModifiableSolrParams();
@@ -120,7 +119,7 @@ public class SuggestionRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return QueryHelper.buildTermsQuery(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
 }

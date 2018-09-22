@@ -1,24 +1,40 @@
+/*
+ * Copyright 2018 Redlink GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.chatpal.solr.ext.handler;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.solr.client.solrj.util.ClientUtils;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.solr.client.solrj.util.ClientUtils;
-import org.apache.solr.common.params.SolrParams;
-
 public class QueryHelper {
-    
+
+    private QueryHelper() { }
+
     /**
      * Builds a query that requires one of the parsed terms by using the Solr terms
      * query parser
-     * @param solrParams
-     * @param param
      * @param field
+     * @param values
      * @return
      */
-    public static String buildTermsQuery(SolrParams solrParams, String param, String field){
-        final String[] values = solrParams.getParams(param);
+    public static String buildTermsQuery(String field, String[] values){
         if (values == null || values.length < 1) {
             return "-" + field + ":*";
         }
@@ -30,13 +46,11 @@ public class QueryHelper {
     /**
      * Builds a query that requires one of the parsed terms by using a normal solr
      * OR query
-     * @param solrParams
-     * @param param
      * @param field
+     * @param values
      * @return
      */
-    public static String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
+    public static String buildOrFilter(String field, String[] values) {
         if (values == null || values.length < 1) {
             return "-" + field + ":*";
         }
