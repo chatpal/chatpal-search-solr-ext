@@ -65,6 +65,12 @@
             <email>jakob.frank@redlink.co</email>
             <organization>Redlink GmbH</organization>
         </developer>
+        <developer>
+            <id>westei</id>
+            <name>Rupert Westenthaler</name>
+            <email>rupert.westenthaler@redlink.co</email>
+            <organization>Redlink GmbH</organization>
+        </developer>
     </developers>
 
     <scm>
