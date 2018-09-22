@@ -14,21 +14,25 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext;
 
 import org.apache.solr.common.params.CommonParams;
 
-public interface ChatpalParams {
+public final class ChatpalParams {
 
-    String PARAM_TEXT = "text";
-    String PARAM_LANG = "language";
-    String PARAM_ACL = "acl[]";
-    String PARAM_TYPE = "type[]";
-    String PARAM_START = CommonParams.START;
-    String PARAM_ROWS = CommonParams.ROWS;
+    private ChatpalParams() { }
 
-    String FIELD_ACL = "rid";
-    String FIELD_TYPE = "type";
-    String FIELD_SUGGESTION = "suggestion";
-    String LANG_NONE = "none";
+    public static final String PARAM_TEXT = "text";
+    public static final String PARAM_LANG = "language";
+    public static final String PARAM_ACL = "acl[]";
+    public static final String PARAM_TYPE = "type[]";
+    public static final String PARAM_START = CommonParams.START;
+    public static final String PARAM_ROWS = CommonParams.ROWS;
+
+    public static final String FIELD_ACL = "rid";
+    public static final String FIELD_TYPE = "type";
+    public static final String FIELD_SUGGESTION = "suggestion";
+
+    public static final String LANG_NONE = "none";
 }

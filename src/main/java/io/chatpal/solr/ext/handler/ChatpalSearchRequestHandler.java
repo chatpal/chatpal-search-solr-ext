@@ -160,7 +160,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                                 doc.setField(targetField, firstVal);
                             } else if (fieldValue instanceof Collection) {
                                 Collection c = (Collection) fieldValue;
-                                if (c.size() > 0 ) {
+                                if (!c.isEmpty()) {
                                     doc.setField(targetField, c.iterator().next());
                                 }
                             } else {
