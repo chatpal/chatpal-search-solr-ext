@@ -19,6 +19,8 @@ package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
@@ -41,10 +43,14 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
+    private ReportingLogger reporting = ReportingLogger.getInstance();
+
     private static final int MAX_SIZE = 10;
 
     @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+
+        long start = System.currentTimeMillis();
 
         ModifiableSolrParams params = new ModifiableSolrParams();
 
@@ -111,6 +117,11 @@ public class SuggestionRequestHandler extends SearchHandler {
             }
 
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
+
+            reporting.logSuggestion(JsonLogMessage.suggestionLog()
+                    .setClient(req.getCore().getName())
+                    .setSearchTerm(text)
+                    .setQueryTime(System.currentTimeMillis() - start));
         }
     }
 
