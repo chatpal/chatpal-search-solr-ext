@@ -14,12 +14,12 @@
  * limitations under the License.
  *
  */
-
 package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
-import io.chatpal.solr.ext.DocType;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
@@ -35,7 +35,12 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,9 +48,14 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
+    private ReportingLogger reporting = ReportingLogger.getInstance();
+
     private static final int MAX_SIZE = 10;
 
+    @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+
+        long start = System.currentTimeMillis();
 
         ModifiableSolrParams params = new ModifiableSolrParams();
 
@@ -112,6 +122,11 @@ public class SuggestionRequestHandler extends SearchHandler {
             }
 
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
+
+            reporting.logSuggestion(JsonLogMessage.suggestionLog()
+                    .setClient(req.getCore().getName())
+                    .setSearchTerm(text)
+                    .setQueryTime(System.currentTimeMillis() - start));
         }
     }
 

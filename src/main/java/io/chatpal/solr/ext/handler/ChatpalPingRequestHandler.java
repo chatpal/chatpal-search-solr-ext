@@ -17,6 +17,8 @@
 package io.chatpal.solr.ext.handler;
 
 import io.chatpal.solr.ext.DocType;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.handler.PingRequestHandler;
@@ -29,6 +31,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ChatpalPingRequestHandler extends PingRequestHandler {
+
+    private ReportingLogger reporting = ReportingLogger.getInstance();
 
     private static final String PARAM_STATS = "stats";
     private static final String PARAM_SCHEMA_VERSION = "schemaVersion";
@@ -55,6 +59,8 @@ public class ChatpalPingRequestHandler extends PingRequestHandler {
             stats.put(DocType.User.getKey(), getStats(DocType.User.getIndexVal(), req));
 
             rsp.add(PARAM_STATS, stats);
+
+            reporting.logPing(JsonLogMessage.indexLog().setClient(req.getCore().getName()).setStats(stats));
         }
 
     }
