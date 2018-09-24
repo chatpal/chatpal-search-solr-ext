@@ -118,6 +118,9 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 .get(buildTypeParam(docType, ChatpalParams.PARAM_ROWS),
                         req.getParams().get(ChatpalParams.PARAM_ROWS)));
 
+        //Exclusions
+        appendExclusionFilter(query,req,docType);
+        
         // Type specific adaptions
         for (QueryAdapter adapter : queryAdapter) {
             adapter.adaptQuery(query, req, rsp, docType);
@@ -251,6 +254,32 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
+    private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, DocType docType) {
+        if(docType == DocType.Message || docType == DocType.Room){
+            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, req.getParams());
+            if(StringUtils.isNoneBlank(exclRoomFilter)){
+                query.add(CommonParams.FQ, exclRoomFilter);
+            }
+        }
+        if(docType == DocType.Message){
+            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, req.getParams());
+            if(StringUtils.isNoneBlank(exclMsgFilter)){
+                query.add(CommonParams.FQ, exclMsgFilter);
+            }
+        }
+    }
+
+    private String buildExclusionFilter(String field, SolrParams params) {
+        if(field == null || params == null) {
+            return null;
+        }
+        String[] excluded = params.getParams(ChatpalParams.PARAM_EXCL_ROOM);
+        if(ArrayUtils.isNotEmpty(excluded)){
+            return QueryHelper.buildOrFilter("-" + field, excluded);
+        } else {
+            return null;
+        }
+    }
 
 
     private interface QueryAdapter {

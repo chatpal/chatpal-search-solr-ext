@@ -26,8 +26,13 @@ public final class ChatpalParams {
     public static final String PARAM_TYPE = "type[]";
     public static final String PARAM_START = CommonParams.START;
     public static final String PARAM_ROWS = CommonParams.ROWS;
+    
+    public static final String PARAM_EXCL_MSG = "excl.msg[]";
+    public static final String PARAM_EXCL_ROOM = "excl.room[]";
 
-    public static final String FIELD_ACL = "rid";
+    public static final String FIELD_MSG_ID = "id";
+    public static final String FIELD_ROOM_ID = "rid";
+    public static final String FIELD_ACL = FIELD_ROOM_ID;
     public static final String FIELD_TYPE = "type";
     public static final String FIELD_SUGGESTION = "suggestion";
     public static final String LANG_NONE = "none";
