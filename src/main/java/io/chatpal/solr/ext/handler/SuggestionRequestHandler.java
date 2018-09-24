@@ -14,13 +14,13 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
@@ -35,12 +35,7 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -135,18 +130,7 @@ public class SuggestionRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildOrFilter(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
-
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
-    }
 }

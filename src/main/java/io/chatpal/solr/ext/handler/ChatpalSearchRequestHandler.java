@@ -14,6 +14,7 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext.handler;
 
 import io.chatpal.solr.ext.ChatpalParams;
@@ -23,7 +24,6 @@ import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.*;
 import org.apache.solr.common.util.NamedList;
@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ChatpalSearchRequestHandler extends SearchHandler {
 
@@ -244,26 +243,15 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return ChatpalParams.FIELD_TYPE + ":" + type.getIndexVal();
     }
 
-    @SuppressWarnings("unused")
     private void appendACLFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         query.add(CommonParams.FQ, buildACLFilter(req.getParams()));
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildOrFilter(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
 
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
-    }
 
     private interface QueryAdapter {
         void adaptQuery(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType);
