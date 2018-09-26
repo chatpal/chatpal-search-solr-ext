@@ -21,6 +21,8 @@ import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.DocType;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
+
+import org.apache.calcite.avatica.proto.Common;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
@@ -99,22 +101,27 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         //NOTES: 
         // * the 'query' parameter overrides the 'text' parameter
         // * the 'text' parameter only allows for wildcards ('*' and '?')
-        String q = req.getParams().get(ChatpalParams.PARAM_QUERY, 
-                QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
-        if(StringUtils.isNoneBlank(q)){
+        String q = req.getParams().get(ChatpalParams.PARAM_QUERY);
+        if(q != null){ //explicit query parsed in request:
+            query.set("defType", "lucene"); //deactivate edismax if a query is parsed
             query.set(CommonParams.Q, q);
-        } //else we do not have a valid query ...
+            if(docType == DocType.Message){
+                query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
+            } //else  use the default fields as configured in the solrconf.xml
+        } else { //normal text query
+            query.set(CommonParams.Q, QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
+            if (docType == DocType.Message) {
+                query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
+                        .replaceAll("\\$\\{lang}", language));
+                query.add(HighlightParams.FIELDS, "text_${lang}"
+                        .replaceAll("\\$\\{lang}", language));
+                query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
+            } //else  use the qf as configured in the solrconfig.xml
+        }
         
         query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
 
         // TODO: Make this configurable
-        if (docType == DocType.Message) {
-            query.set(DisMaxParams.QF, "text^2 text_${lang}^1 decompose_text_${lang}^.5"
-                    .replaceAll("\\$\\{lang}", language));
-            query.add(HighlightParams.FIELDS, "text_${lang}"
-                    .replaceAll("\\$\\{lang}", language));
-            query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
-        }
 
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
