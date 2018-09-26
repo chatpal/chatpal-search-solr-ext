@@ -20,7 +20,16 @@ import org.apache.solr.common.params.CommonParams;
 
 public final class ChatpalParams {
 
+	/**
+	 * THe basic Rocket.Chat search text
+	 */
     public static final String PARAM_TEXT = "text";
+    /**
+     * Allows to parse a Query using Solr syntax. If present this takes
+     * preference over {@link #PARAM_TEXT}
+     */
+    public static final String PARAM_QUERY = "query";
+
     public static final String PARAM_LANG = "language";
     public static final String PARAM_ACL = "acl[]";
     public static final String PARAM_TYPE = "type[]";

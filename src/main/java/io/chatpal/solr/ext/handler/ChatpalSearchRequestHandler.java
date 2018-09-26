@@ -24,6 +24,7 @@ import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
+import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.*;
 import org.apache.solr.common.util.NamedList;
@@ -95,8 +96,15 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
-        query.set(CommonParams.Q, req.getParams().get(ChatpalParams.PARAM_TEXT));
-
+        //NOTES: 
+        // * the 'query' parameter overrides the 'text' parameter
+        // * the 'text' parameter only allows for wildcards ('*' and '?')
+        String q = req.getParams().get(ChatpalParams.PARAM_QUERY, 
+                QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
+        if(StringUtils.isNoneBlank(q)){
+            query.set(CommonParams.Q, q);
+        } //else we do not have a valid query ...
+        
         query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
 
         // TODO: Make this configurable
