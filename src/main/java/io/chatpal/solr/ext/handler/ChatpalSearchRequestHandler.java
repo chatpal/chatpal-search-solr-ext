@@ -64,8 +64,12 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     public void handleRequestBody(SolrQueryRequest originalReq, SolrQueryResponse rsp) throws Exception {
         long start = System.currentTimeMillis();
 
-        final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp, this::appendACLFilter);
-        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp, this::appendACLFilter);
+        final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
+        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
         final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
 
         final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
@@ -118,9 +122,6 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 .get(buildTypeParam(docType, ChatpalParams.PARAM_ROWS),
                         req.getParams().get(ChatpalParams.PARAM_ROWS)));
 
-        //Exclusions
-        appendExclusionFilter(query,req,docType);
-        
         // Type specific adaptions
         for (QueryAdapter adapter : queryAdapter) {
             adapter.adaptQuery(query, req, rsp, docType);
@@ -254,16 +255,17 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
-    private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, DocType docType) {
+    private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        final SolrParams params = req.getParams();
         if(docType == DocType.Message || docType == DocType.Room){
-            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, req.getParams().getParams(ChatpalParams.PARAM_EXCL_ROOM));
-            if(StringUtils.isNoneBlank(exclRoomFilter)){
+            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, params.getParams(ChatpalParams.PARAM_EXCL_ROOM));
+            if(StringUtils.isNotBlank(exclRoomFilter)){
                 query.add(CommonParams.FQ, exclRoomFilter);
             }
         }
         if(docType == DocType.Message){
-            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, req.getParams().getParams(ChatpalParams.PARAM_EXCL_MSG));
-            if(StringUtils.isNoneBlank(exclMsgFilter)){
+            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, params.getParams(ChatpalParams.PARAM_EXCL_MSG));
+            if(StringUtils.isNotBlank(exclMsgFilter)){
                 query.add(CommonParams.FQ, exclMsgFilter);
             }
         }
