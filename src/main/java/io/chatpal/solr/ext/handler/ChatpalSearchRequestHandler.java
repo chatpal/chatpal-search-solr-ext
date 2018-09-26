@@ -64,8 +64,12 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     public void handleRequestBody(SolrQueryRequest originalReq, SolrQueryResponse rsp) throws Exception {
         long start = System.currentTimeMillis();
 
-        final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp, this::appendACLFilter);
-        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp, this::appendACLFilter);
+        final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
+                this::setLanguageConfig,
+                this::setTimeRegressionBoost,
+                this::appendACLFilter);
+        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
+                this::appendACLFilter);
         final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
 
         final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
@@ -98,16 +102,6 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         query.set(CommonParams.Q, req.getParams().get(ChatpalParams.PARAM_TEXT));
 
         query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
-
-        // TODO: Make this configurable
-        if (docType == DocType.Message) {
-            query.set(DisMaxParams.QF, "text^2 text_${lang}^1 decompose_text_${lang}^.5"
-                    .replaceAll("\\$\\{lang}", language));
-            query.add(HighlightParams.FIELDS, "text_${lang}"
-                    .replaceAll("\\$\\{lang}", language));
-            query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
-        }
-
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
 
@@ -145,6 +139,18 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
             return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
+    }
+
+    private void setLanguageConfig(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
+        query.set(DisMaxParams.QF, "text^2 text_${lang}^1 decompose_text_${lang}^.5"
+                .replaceAll("\\$\\{lang}", language));
+        query.add(HighlightParams.FIELDS, "text_${lang}"
+                .replaceAll("\\$\\{lang}", language));
+    }
+
+    private void setTimeRegressionBoost(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
     }
 
     private boolean typeFilterAccepts(SolrQueryRequest req, DocType type) {
