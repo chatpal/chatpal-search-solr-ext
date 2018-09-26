@@ -3,3 +3,9 @@ language: java
 jdk:
   - openjdk8
   - oraclejdk8
+
+cache:
+  directories:
+  - $HOME/.m2
+before_cache:
+  - rm -rf $HOME/.m2/io/chatpal/solr/solr-ext/
