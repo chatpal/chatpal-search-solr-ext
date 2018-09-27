@@ -52,11 +52,12 @@ public class SuggestionRequestHandler extends SearchHandler {
 
         long start = System.currentTimeMillis();
 
-        ModifiableSolrParams params = new ModifiableSolrParams();
+        final ModifiableSolrParams params = new ModifiableSolrParams();
 
         String text = req.getParams().get(ChatpalParams.PARAM_TEXT);
 
         if (StringUtils.isEmpty(text)) {
+            //noinspection unchecked
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, Collections.emptyList());
             return;
         }
@@ -69,13 +70,15 @@ public class SuggestionRequestHandler extends SearchHandler {
         params.set(FacetParams.FACET_LIMIT, 15);
 
         //set filter for type
-        String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
+        final String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
         if (typeParams != null) {
-            String types = String.join(" OR ", typeParams);
-            params.add(CommonParams.FQ, ChatpalParams.FIELD_TYPE + ":(" + types + ")");
+            params.add(CommonParams.FQ, QueryHelper.buildTermsQuery(ChatpalParams.FIELD_TYPE, typeParams));
         }
 
-        List<String> tokens = Stream.of(text.split(" ")).map(String::toLowerCase).collect(Collectors.toList());
+        // FIXME: should we filter emtpy tokens?
+        final List<String> tokens = Stream.of(text.split(" "))
+                .map(String::toLowerCase)
+                .collect(Collectors.toList());
 
         if (text.endsWith(" ")) {
             text = null;
@@ -84,28 +87,28 @@ public class SuggestionRequestHandler extends SearchHandler {
         }
 
         tokens.forEach(t -> params.add(CommonParams.FQ, ChatpalParams.FIELD_SUGGESTION + ":" + t));
+        // FIXME: What happens if text is 'null' here?
         params.set(FacetParams.FACET_PREFIX, text);
 
         appendACLFilter(params, req);
-
-        //logger.info("suggestion query: {}", params);
 
         try (LocalSolrQueryRequest userRequest = new LocalSolrQueryRequest(req.getCore(), params)) {
             final SolrQueryResponse response = new SolrQueryResponse();
 
             super.handleRequestBody(userRequest, response);
             //build response
-            Iterator<Map.Entry> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
+            final Iterator<Map.Entry> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
 
             ArrayList<Map> suggestions = new ArrayList<>();
 
-            String prefix = tokens.stream().collect(Collectors.joining(" "));
+            String prefix = String.join(" ", tokens);
 
             if (prefix.length() > 0) prefix += " ";
 
             while (entries.hasNext()) {
 
                 Map.Entry entry = entries.next();
+                // FIXME: this 'contains' will never return true...
                 if (!tokens.contains(entry.getKey())) {
                     suggestions.add(ImmutableMap.of(
                             "text", prefix + entry.getKey(),
@@ -113,9 +116,10 @@ public class SuggestionRequestHandler extends SearchHandler {
                     ));
                 }
 
-                if (suggestions.size() == MAX_SIZE) break;
+                if (suggestions.size() >= MAX_SIZE) break;
             }
 
+            //noinspection unchecked
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
 
             reporting.logSuggestion(JsonLogMessage.suggestionLog()
