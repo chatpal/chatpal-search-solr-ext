@@ -67,9 +67,11 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
                 this::setLanguageConfig,
                 this::setTimeRegressionBoost,
-                this::appendACLFilter);
+                this::appendACLFilter,
+                this::appendExclusionFilter);
         final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
-                this::appendACLFilter);
+                this::appendACLFilter,
+                this::appendExclusionFilter);
         final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
 
         final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
@@ -99,9 +101,18 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
-        query.set(CommonParams.Q, req.getParams().get(ChatpalParams.PARAM_TEXT));
+        //NOTES:
+        // * the 'query' parameter overrides the 'text' parameter
+        // * the 'text' parameter only allows for wildcards ('*' and '?')
+        final String q = req.getParams().get(ChatpalParams.PARAM_QUERY);
+        if(q != null){ //explicit query parsed in request:
+            query.set("defType", "lucene"); //deactivate edismax if a query is parsed
+            query.set(CommonParams.Q, q);
+        } else { //normal text query
+            query.set(CommonParams.Q, QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
+        }
 
-        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
+        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT)); // TODO should sort be type aware?
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
 
@@ -143,14 +154,24 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private void setLanguageConfig(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
-        query.set(DisMaxParams.QF, "text^2 text_${lang}^1 decompose_text_${lang}^.5"
-                .replaceAll("\\$\\{lang}", language));
-        query.add(HighlightParams.FIELDS, "text_${lang}"
-                .replaceAll("\\$\\{lang}", language));
+        if (isParamSet(req, ChatpalParams.PARAM_QUERY)) {
+            query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
+        } else {
+            query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
+                    .replaceAll("\\$\\{lang}", language));
+            query.add(HighlightParams.FIELDS, "text_${lang}"
+                    .replaceAll("\\$\\{lang}", language));
+        }
     }
 
     private void setTimeRegressionBoost(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
-        query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
+        if (!isParamSet(req, ChatpalParams.PARAM_QUERY)) {
+            query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
+        }
+    }
+
+    private boolean isParamSet(SolrQueryRequest req, String param) {
+        return req.getParams().get(param) != null;
     }
 
     private boolean typeFilterAccepts(SolrQueryRequest req, DocType type) {
@@ -257,6 +278,28 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
+    private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        final SolrParams params = req.getParams();
+        if(docType == DocType.Message || docType == DocType.Room){
+            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, params.getParams(ChatpalParams.PARAM_EXCL_ROOM));
+            if(StringUtils.isNotBlank(exclRoomFilter)){
+                query.add(CommonParams.FQ, exclRoomFilter);
+            }
+        }
+        if(docType == DocType.Message){
+            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, params.getParams(ChatpalParams.PARAM_EXCL_MSG));
+            if(StringUtils.isNotBlank(exclMsgFilter)){
+                query.add(CommonParams.FQ, exclMsgFilter);
+            }
+        }
+    }
+
+    private String buildExclusionFilter(String field, String...excluded) {
+        if(field == null || ArrayUtils.isEmpty(excluded)) {
+            return null;
+        }
+        return "-" + QueryHelper.buildTermsQuery(field, excluded);
+    }
 
 
     private interface QueryAdapter {
