@@ -53,14 +53,18 @@ public class QueryHelper {
     }
     /**
      * Builds a query that requires one of the parsed terms by using a normal solr
-     * OR query
+     * OR query.
      * @param field the field-name of the or query
      * @param values the values to query for ({@code OR})
      * @return field-query-string, connected with the {@code OR} operator
      */
     public static String buildOrFilter(String field, String[] values) {
         if (values == null || values.length < 1) {
-            return "-" + field + ":*";
+            if (StringUtils.isBlank(field)) {
+                return "-[* TO *]";
+            } else {
+                return "-" + field + ":*";
+            }
         }
 
         return "{!q.op=OR}" +
