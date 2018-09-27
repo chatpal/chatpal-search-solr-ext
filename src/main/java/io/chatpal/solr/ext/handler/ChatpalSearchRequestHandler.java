@@ -152,6 +152,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         }
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void setLanguageConfig(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
         if (isParamSet(req, ChatpalParams.PARAM_QUERY)) {
@@ -164,6 +165,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         }
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void setTimeRegressionBoost(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         if (!isParamSet(req, ChatpalParams.PARAM_QUERY)) {
             query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
@@ -194,37 +196,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         while (documentIterator.hasNext()) {
             final SolrDocument doc = documentIterator.next();
 
-            if (highlighting != null) {
-                final String id = String.valueOf(getFirstValue(doc, schema.getUniqueKeyField()));
-                final NamedList<Object> highlights = highlighting.get(id);
-                if (highlights != null) {
-                    for (Map.Entry<String, Object> highlight : highlights) {
-                        final String fieldName = highlight.getKey();
-                        final Object fieldValue = highlight.getValue();
-
-                        final String targetField = StringUtils.removeEnd(fieldName, "_" + language);
-
-                        if (!rspContext.getReturnFields().wantsField(targetField)) continue;
-
-                        if (isMultiValueFiled(schema, targetField)) {
-                            doc.setField(targetField, fieldValue);
-                        } else if (fieldValue != null) {
-                            if (fieldValue.getClass().isArray()) {
-                                final Object firstVal = ((Object[]) fieldValue)[0];
-                                doc.setField(targetField, firstVal);
-                            } else if (fieldValue instanceof Collection) {
-                                Collection c = (Collection) fieldValue;
-                                if (!c.isEmpty()) {
-                                    doc.setField(targetField, c.iterator().next());
-                                }
-                            } else {
-                                doc.setField(targetField, fieldValue);
-                            }
-                        }
-
-                    }
-                }
-            }
+            inlineHighlighting(doc, highlighting, rspContext, schema, language);
 
             for (String fName : new HashSet<>(doc.getFieldNames())) {
                 if (!rspContext.getReturnFields().wantsField(fName)) {
@@ -249,6 +221,52 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return result;
     }
 
+    private void inlineHighlighting(SolrDocument doc, NamedList<NamedList<Object>> highlighting, ResultContext rspContext, IndexSchema schema, String language) {
+        if (highlighting == null) return;
+
+        final String id = String.valueOf(getFirstValue(doc, schema.getUniqueKeyField()));
+        final NamedList<Object> highlights = highlighting.get(id);
+        if (highlights == null) return;
+
+        for (Map.Entry<String, Object> highlight : highlights) {
+            final String fieldName = highlight.getKey();
+            final Object fieldValue = highlight.getValue();
+
+            final String targetField = StringUtils.removeEnd(fieldName, "_" + language);
+
+            if (!rspContext.getReturnFields().wantsField(targetField)) continue;
+
+            if (isMultiValueFiled(schema, targetField)) {
+                doc.setField(targetField, fieldValue);
+            } else {
+                final Object firstVal = getFirstValue(fieldValue);
+                if (firstVal != null) {
+                    doc.setField(targetField, fieldValue);
+                }
+            }
+        }
+    }
+
+    private Object getFirstValue(Object fieldValue) {
+        if (fieldValue == null) {
+            return null;
+        } else if (fieldValue.getClass().isArray()) {
+            final Object[] arr = (Object[]) fieldValue;
+            if (arr.length > 0) {
+                return arr[0];
+            }
+        } else if (fieldValue instanceof Collection) {
+            final Collection c = (Collection) fieldValue;
+            if (!c.isEmpty()) {
+                return c.iterator().next();
+            }
+        } else {
+            return fieldValue;
+        }
+
+        return null;
+    }
+
     private boolean isMultiValueFiled(IndexSchema schema, String fieldName) {
         final SchemaField fieldOrNull = schema.getFieldOrNull(fieldName);
         return fieldOrNull == null || fieldOrNull.multiValued();
@@ -270,6 +288,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return ChatpalParams.FIELD_TYPE + ":" + type.getIndexVal();
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void appendACLFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         query.add(CommonParams.FQ, buildACLFilter(req.getParams()));
     }
@@ -278,6 +297,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         final SolrParams params = req.getParams();
         if(docType == DocType.Message || docType == DocType.Room){
