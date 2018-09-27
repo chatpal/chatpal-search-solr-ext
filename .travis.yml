@@ -18,4 +18,4 @@ cache:
   - $HOME/.m2
   - $HOME/.sonar/cache
 before_cache:
-  - rm -rf $HOME/.m2/io/chatpal/solr/solr-ext/
+  - rm -rf $HOME/.m2/repository/io/chatpal/solr/solr-ext/
