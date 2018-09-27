@@ -18,6 +18,7 @@
 package io.chatpal.solr.ext.handler;
 
 import org.hamcrest.CoreMatchers;
+import org.hamcrest.Matcher;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -34,10 +35,16 @@ public class QueryHelperTest {
                 CoreMatchers.is("{!terms f=foo}x1,x3,x5,x6"));
 
         Assert.assertThat(QueryHelper.buildTermsQuery("empty", new String[0]),
-                CoreMatchers.is("-empty:*"));
+                CoreMatchers.is("{!terms f=empty}"));
         Assert.assertThat(QueryHelper.buildTermsQuery("null", null),
-                CoreMatchers.is("-null:*"));
+                CoreMatchers.is("{!terms f=null}"));
 
+        try {
+            QueryHelper.buildTermsQuery(null, new String[0]);
+            Assert.fail("IllegalArgumentException expected");
+        } catch (final Exception e) {
+            Assert.assertThat(e, CoreMatchers.instanceOf(IllegalArgumentException.class));
+        }
     }
 
     @Test
@@ -47,10 +54,18 @@ public class QueryHelperTest {
         Assert.assertThat(QueryHelper.buildOrFilter("foo", new String[]{"x1", "x\"2", "x3", null, "x5", "", "x7"}),
                 CoreMatchers.is("{!q.op=OR}foo:(x1 x\\\"2 x3 x5 x7)"));
 
+        Assert.assertThat(QueryHelper.buildOrFilter(null, new String[]{"x1", "x2", "x3", "x4"}),
+                CoreMatchers.is("{!q.op=OR}(x1 x2 x3 x4)"));
+        Assert.assertThat(QueryHelper.buildOrFilter(null, new String[]{"x1", "x\"2", "x3", null, "x5", "", "x7"}),
+                CoreMatchers.is("{!q.op=OR}(x1 x\\\"2 x3 x5 x7)"));
+
         Assert.assertThat(QueryHelper.buildOrFilter("empty", new String[0]),
                 CoreMatchers.is("-empty:*"));
         Assert.assertThat(QueryHelper.buildOrFilter("null", null),
                 CoreMatchers.is("-null:*"));
+
+        Assert.assertThat(QueryHelper.buildOrFilter(null, new String[0]), CoreMatchers.is("-[* TO *]"));
+        Assert.assertThat(QueryHelper.buildOrFilter(null, null), CoreMatchers.is("-[* TO *]"));
 
     }
 }
