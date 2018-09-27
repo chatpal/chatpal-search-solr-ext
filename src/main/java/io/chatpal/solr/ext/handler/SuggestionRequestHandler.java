@@ -18,10 +18,12 @@
 package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
+import io.chatpal.solr.ext.ChatpalConfig;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
-import org.apache.solr.common.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -41,11 +43,28 @@ import java.util.stream.Stream;
 
 public class SuggestionRequestHandler extends SearchHandler {
 
+    private static final int DEFAULT_SUGGESTION_SIZE = 10;
+
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
     private ReportingLogger reporting = ReportingLogger.getInstance();
 
-    private static final int MAX_SIZE = 10;
+    private int suggestionsSize = DEFAULT_SUGGESTION_SIZE;
+
+    @Override
+    public void init(NamedList args) {
+        super.init(args);
+
+        if( args != null ) {
+            final Object size = args.get(ChatpalConfig.CONF_SUGGESTION_SIZE);
+            suggestionsSize = NumberUtils.toInt(String.valueOf(size), DEFAULT_SUGGESTION_SIZE);
+            if (suggestionsSize <= 0) {
+                logger.warn("Configured {} is less than 1, falling back to default {}",
+                        ChatpalConfig.CONF_SUGGESTION_SIZE, DEFAULT_SUGGESTION_SIZE);
+                suggestionsSize = DEFAULT_SUGGESTION_SIZE;
+            }
+        }
+    }
 
     @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
@@ -75,8 +94,7 @@ public class SuggestionRequestHandler extends SearchHandler {
             params.add(CommonParams.FQ, QueryHelper.buildTermsQuery(ChatpalParams.FIELD_TYPE, typeParams));
         }
 
-        // FIXME: should we filter emtpy tokens?
-        final List<String> tokens = Stream.of(text.split(" "))
+        final List<String> tokens = Stream.of(text.split("\\s+"))
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
 
@@ -87,7 +105,6 @@ public class SuggestionRequestHandler extends SearchHandler {
         }
 
         tokens.forEach(t -> params.add(CommonParams.FQ, ChatpalParams.FIELD_SUGGESTION + ":" + t));
-        // FIXME: What happens if text is 'null' here?
         params.set(FacetParams.FACET_PREFIX, text);
 
         appendACLFilter(params, req);
@@ -97,18 +114,16 @@ public class SuggestionRequestHandler extends SearchHandler {
 
             super.handleRequestBody(userRequest, response);
             //build response
-            final Iterator<Map.Entry> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
+            //noinspection unchecked
+            final Iterator<Map.Entry<String, Object>> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
 
-            ArrayList<Map> suggestions = new ArrayList<>();
+            final List<Map> suggestions = new ArrayList<>();
 
             String prefix = String.join(" ", tokens);
-
             if (prefix.length() > 0) prefix += " ";
 
             while (entries.hasNext()) {
-
-                Map.Entry entry = entries.next();
-                // FIXME: this 'contains' will never return true...
+                final Map.Entry<String, Object> entry = entries.next();
                 if (!tokens.contains(entry.getKey())) {
                     suggestions.add(ImmutableMap.of(
                             "text", prefix + entry.getKey(),
@@ -116,7 +131,7 @@ public class SuggestionRequestHandler extends SearchHandler {
                     ));
                 }
 
-                if (suggestions.size() >= MAX_SIZE) break;
+                if (suggestions.size() >= suggestionsSize) break;
             }
 
             //noinspection unchecked
