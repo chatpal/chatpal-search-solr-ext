@@ -39,10 +39,15 @@ public class QueryHelper {
         if(StringUtils.isBlank(field)){
             throw new IllegalArgumentException("The parsed field MUST NOT be NULL nor blank");
         }
+
         //NOTE: we create an empty terms filter if no values are parsed
+        if (values == null) {
+            values = new String[0];
+        }
+
         return String.format("{!terms f=%s}", field) +
-                values == null ? "" : Arrays.stream(values)
-                        .filter(StringUtils::isNoneBlank)
+                Arrays.stream(values)
+                        .filter(StringUtils::isNotBlank)
                         .collect(Collectors.joining(","));
     }
     /**
@@ -57,10 +62,11 @@ public class QueryHelper {
             return "-" + field + ":*";
         }
 
-        return "{!q.op=OR}" + 
+        return "{!q.op=OR}" +
                 //NOTE: a NULL or blank field denotes to the configured 'df'
                 (StringUtils.isBlank(field) ? "" : (field + ":")) + 
                 Arrays.stream(values)
+                        .filter(StringUtils::isNotBlank)
                         .map(ClientUtils::escapeQueryChars)
                         .collect(Collectors.joining(" ", "(", ")"));
     }
