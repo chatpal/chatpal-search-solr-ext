@@ -7,9 +7,8 @@ jdk:
 addons:
   sonarcloud:
     organization: "chatpal"
-    projectKey: "chatpal-search-solr-ext"
     token:
       secure: uVseolKiezgmEQLzsUt7FBAY75gewWs+9CrQ/ctns5+OeBmzx8ezwHWUK92U8PqeCcuZH7fsRLs3QkoOlgpvVs4nZTg673jYGQt2gY5mfvoDyOzqgzTu6cGbpneiQf2hlRHkdsqag2quuHqLFBL/J61aod26lThBJ7qx7JkSqVXreUPQe7zuiXGn4SY4W+H85Ova2BvH8Kco+mrgljus784sQwCp8gFSW5fXtgU9VI2fntnBiz1yTwyz7CYS5B0FGwfki8u5+h026w6hYD+B+XePawTrLDQVh0lBVjd+ZmccehlrQHXNPgnEmY9xtMySIHw4WT1B+DdifZlzZr8x/2GnBjQpQNm3rcqXI3Zgz9/19eVPDoMwYFfzYOdW9kAeA2DGlcQakBbrg9FNIDBCXEAhVNeY26XlHxvfpZhM0VZPJurt/eVG9iOUVCjbQaey9yQu+9Y+dOMln7O7Ma9s9ChAMJ7IBZqiRjZE1uxk8zrtwPdw0gAmtDWo3VqOpg3fg/3skHccDZDB0jxXgF570Qriv6ZaJI+u0Wb+hJ3wchfquwHE1ctmvvJn/3YfDi0AQ4roJ4GGjYgcxIIgqd16/6Rebva8mnRCkESH9exBSUhTlPJzUJxCv0Ql62Vt6vTLlbabDnmTGdOQopROGtDn18FutxFj28iaNeGXiJWT7EY=
 
 script:
-  - mvn -B org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar
+  - mvn -B org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar -Dsonar.branch=${TRAVIS_BRANCH}
