@@ -19,8 +19,8 @@ package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
 import io.chatpal.solr.ext.ChatpalParams;
-import io.chatpal.solr.ext.DocType;
-import org.apache.solr.client.solrj.util.ClientUtils;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
@@ -43,9 +43,14 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
+    private ReportingLogger reporting = ReportingLogger.getInstance();
+
     private static final int MAX_SIZE = 10;
 
+    @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+
+        long start = System.currentTimeMillis();
 
         ModifiableSolrParams params = new ModifiableSolrParams();
 
@@ -112,6 +117,11 @@ public class SuggestionRequestHandler extends SearchHandler {
             }
 
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
+
+            reporting.logSuggestion(JsonLogMessage.suggestionLog()
+                    .setClient(req.getCore().getName())
+                    .setSearchTerm(text)
+                    .setQueryTime(System.currentTimeMillis() - start));
         }
     }
 
@@ -120,18 +130,7 @@ public class SuggestionRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildOrFilter(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
-        }
-
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
-    }
 }

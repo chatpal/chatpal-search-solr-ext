@@ -18,3 +18,10 @@ jobs:
         -Dsonar.branch=${TRAVIS_BRANCH}
         -Dsonar.projectKey=chatpal-search-solr-ext
         org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar
+
+cache:
+  directories:
+  - $HOME/.m2
+  - $HOME/.sonar/cache
+before_cache:
+  - rm -rf $HOME/.m2/io/chatpal/solr/solr-ext/

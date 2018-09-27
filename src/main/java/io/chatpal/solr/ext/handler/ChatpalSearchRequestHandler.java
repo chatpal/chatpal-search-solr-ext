@@ -14,14 +14,17 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext.handler;
 
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.DocType;
+import io.chatpal.solr.ext.logging.JsonLogMessage;
+import io.chatpal.solr.ext.logging.ReportingLogger;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.*;
 import org.apache.solr.common.util.NamedList;
@@ -38,11 +41,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private Logger logger = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
+
+    private ReportingLogger reporting = ReportingLogger.getInstance();
 
     private Map<DocType, SolrParams> defaultParams = new EnumMap<>(DocType.class);
 
@@ -59,29 +63,67 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     @Override
     public void handleRequestBody(SolrQueryRequest originalReq, SolrQueryResponse rsp) throws Exception {
-        queryFor(DocType.Message, originalReq, rsp, this::appendACLFilter);
-        queryFor(DocType.Room, originalReq, rsp, this::appendACLFilter);
-        queryFor(DocType.User, originalReq, rsp);
+        long start = System.currentTimeMillis();
+
+        final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
+        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
+        final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
+
+        final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
+                .setClient(originalReq.getCore().getName())
+                .setSearchTerm(originalReq.getParams().get(ChatpalParams.PARAM_TEXT));
+
+        if (msgLog != null) {
+            log.setResultSize(DocType.Message.getKey(), msgLog.numFound);
+        }
+
+        if (roomLog != null) {
+            log.setResultSize(DocType.Message.getKey(), roomLog.numFound);
+        }
+
+        if (userLog != null) {
+            log.setResultSize(DocType.Message.getKey(), userLog.numFound);
+        }
+
+        log.setQueryTime(System.currentTimeMillis() - start);
+
+        reporting.logQuery(log);
     }
 
-    private void queryFor(DocType docType, SolrQueryRequest req, SolrQueryResponse rsp, QueryAdapter... queryAdapter) throws Exception {
-        if (!typeFilterAccepts(req, docType)) return;
+    private Loggable queryFor(DocType docType, SolrQueryRequest req, SolrQueryResponse rsp, QueryAdapter... queryAdapter) throws Exception {
+        if (!typeFilterAccepts(req, docType)) return null;
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
-        query.set(CommonParams.Q, req.getParams().get(ChatpalParams.PARAM_TEXT));
-
+        //NOTES: 
+        // * the 'query' parameter overrides the 'text' parameter
+        // * the 'text' parameter only allows for wildcards ('*' and '?')
+        String q = req.getParams().get(ChatpalParams.PARAM_QUERY);
+        if(q != null){ //explicit query parsed in request:
+            query.set("defType", "lucene"); //deactivate edismax if a query is parsed
+            query.set(CommonParams.Q, q);
+            if(docType == DocType.Message){
+                query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
+            } //else  use the default fields as configured in the solrconf.xml
+        } else { //normal text query
+            query.set(CommonParams.Q, QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
+            if (docType == DocType.Message) {
+                query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
+                        .replaceAll("\\$\\{lang}", language));
+                query.add(HighlightParams.FIELDS, "text_${lang}"
+                        .replaceAll("\\$\\{lang}", language));
+                query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
+            } //else  use the qf as configured in the solrconfig.xml
+        }
+        
         query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
 
         // TODO: Make this configurable
-        if (docType == DocType.Message) {
-            query.set(DisMaxParams.QF, "text^2 text_${lang}^1 decompose_text_${lang}^.5"
-                    .replaceAll("\\$\\{lang}", language));
-            query.add(HighlightParams.FIELDS, "text_${lang}"
-                    .replaceAll("\\$\\{lang}", language));
-            query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
-        }
 
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
@@ -117,6 +159,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             super.handleRequestBody(subRequest, response);
 
             rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+
+            return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
     }
 
@@ -216,28 +260,47 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return ChatpalParams.FIELD_TYPE + ":" + type.getIndexVal();
     }
 
-    @SuppressWarnings("unused")
     private void appendACLFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         query.add(CommonParams.FQ, buildACLFilter(req.getParams()));
     }
 
     private String buildACLFilter(SolrParams params) {
-        return buildOrFilter(params, ChatpalParams.PARAM_ACL, ChatpalParams.FIELD_ACL);
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
-    private String buildOrFilter(SolrParams solrParams, String param, String field) {
-        final String[] values = solrParams.getParams(param);
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
+    private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        final SolrParams params = req.getParams();
+        if(docType == DocType.Message || docType == DocType.Room){
+            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, params.getParams(ChatpalParams.PARAM_EXCL_ROOM));
+            if(StringUtils.isNotBlank(exclRoomFilter)){
+                query.add(CommonParams.FQ, exclRoomFilter);
+            }
         }
-
-        return "{!q.op=OR}" + field + ":" +
-                Arrays.stream(values)
-                        .map(ClientUtils::escapeQueryChars)
-                        .collect(Collectors.joining(" ", "(", ")"));
+        if(docType == DocType.Message){
+            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, params.getParams(ChatpalParams.PARAM_EXCL_MSG));
+            if(StringUtils.isNotBlank(exclMsgFilter)){
+                query.add(CommonParams.FQ, exclMsgFilter);
+            }
+        }
     }
+
+    private String buildExclusionFilter(String field, String...excluded) {
+        if(field == null || ArrayUtils.isEmpty(excluded)) {
+            return null;
+        }
+        return "-" + QueryHelper.buildTermsQuery(field, excluded);
+    }
+
 
     private interface QueryAdapter {
         void adaptQuery(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType);
+    }
+
+    static class Loggable {
+        long numFound;
+
+        Loggable(long numFound) {
+            this.numFound = numFound;
+        }
     }
 }
