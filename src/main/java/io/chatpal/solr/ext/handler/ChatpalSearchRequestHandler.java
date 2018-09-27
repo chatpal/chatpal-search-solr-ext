@@ -22,11 +22,9 @@ import io.chatpal.solr.ext.DocType;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
 
-import org.apache.calcite.avatica.proto.Common;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.*;
 import org.apache.solr.common.util.NamedList;
