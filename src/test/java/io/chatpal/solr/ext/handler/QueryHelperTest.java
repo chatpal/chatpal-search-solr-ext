@@ -68,4 +68,14 @@ public class QueryHelperTest {
         Assert.assertThat(QueryHelper.buildOrFilter(null, null), CoreMatchers.is("-[* TO *]"));
 
     }
+    
+    @Test
+    public void cleanTextQuery() {
+        Assert.assertThat(QueryHelper.cleanTextQuery("Test text"), CoreMatchers.is("Test text"));
+        Assert.assertThat(QueryHelper.cleanTextQuery("Test (Junit)"), CoreMatchers.is("Test \\(Junit\\)"));
+        Assert.assertThat(QueryHelper.cleanTextQuery("Test[1]"), CoreMatchers.is("Test\\[1\\]"));
+        Assert.assertThat(QueryHelper.cleanTextQuery("Test*"), CoreMatchers.is("Test*"));
+        Assert.assertThat(QueryHelper.cleanTextQuery("-Test* +Unit &fail"), CoreMatchers.is("-Test* +Unit \\&fail"));
+        Assert.assertThat(QueryHelper.cleanTextQuery("~1:3"), CoreMatchers.is("\\~1\\:3"));
+    }
 }

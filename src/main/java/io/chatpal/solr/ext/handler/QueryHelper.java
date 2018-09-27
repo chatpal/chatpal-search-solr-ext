@@ -20,6 +20,8 @@ package io.chatpal.solr.ext.handler;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.util.ClientUtils;
 
+import io.chatpal.solr.ext.ChatpalParams;
+
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -75,4 +77,42 @@ public class QueryHelper {
                         .map(ClientUtils::escapeQueryChars)
                         .collect(Collectors.joining(" ", "(", ")"));
     }
+    
+    /**
+     * Escapes <a href=
+     * "https://lucene.apache.org/solr/guide/7_5/the-standard-query-parser.html">Lucene
+     * query parser syntax</a> not allowed in the {@link ChatpalParams#PARAM_TEXT} parameter
+     * 
+     * Allowed are <ul>
+     * <li> <code>*</code> for prefix/infix
+     * <li> <code>"</code> for phrase queries
+     * <li> <code>-</code> for negation and <code>+</code> for MUST
+     * <li> white spaces are also not escaped 
+     * </ul>
+     */
+    public static String cleanTextQuery(String s) {
+        if (s == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            // These characters are part of the query syntax and NOT allowed in
+            // the 'text' parameter.
+            // So they must be escaped
+            // NOTE: 
+            //   * we do allow * for prefix/infix
+            //   * we do allow " phrase queries
+            //   * we do allow - for negation and + for MUST
+            //   * we do not escape white spaces as we do want OR for multiple terms
+            if (c == '\\' || c == '!' || c == '(' || c == ')' || c == ':' || c == '^'
+                    || c == '[' || c == ']' || c == '{' || c == '}' || c == '~' || c == '|' || c == '&'
+                    || c == '?' || c == ';' || c == '/') {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
 }
