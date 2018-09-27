@@ -14,8 +14,10 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext;
 
+@SuppressWarnings("squid:S00115")
 public enum DocType {
     Message("message"),
     User("user"),
