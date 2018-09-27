@@ -275,9 +275,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if(field == null || ArrayUtils.isEmpty(excluded)) {
             return null;
         }
-        String termsQuery = QueryHelper.buildTermsQuery(field, excluded);
-        //if the termsQuery is NOT blink we need to negate it as we do not want results with ony of the parsed terms
-        return StringUtils.isNotBlank(termsQuery) ? "-" + termsQuery : termsQuery;
+        return "-" + QueryHelper.buildTermsQuery(field, excluded);
     }
 
 

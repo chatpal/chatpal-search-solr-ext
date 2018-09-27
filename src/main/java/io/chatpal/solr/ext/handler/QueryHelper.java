@@ -30,16 +30,18 @@ public class QueryHelper {
     /**
      * Builds a query that requires one of the parsed terms by using the Solr terms
      * query parser
-     * @param field
-     * @param values
-     * @return
+     * @param field the field. MUST NOT be <code>null</code> nor blank
+     * @param values the values
+     * @return the terms filter
+     * @throws IllegalArgumentException if <code>null</code> or blank is parsed as field
      */
     public static String buildTermsQuery(String field, String[] values){
-        if (values == null || values.length < 1) {
-            return "-" + field + ":*";
+        if(StringUtils.isBlank(field)){
+            throw new IllegalArgumentException("The parsed field MUST NOT be NULL nor blank");
         }
+        //NOTE: we create an empty terms filter if no values are parsed
         return String.format("{!terms f=%s}", field) +
-                Arrays.stream(values)
+                values == null ? "" : Arrays.stream(values)
                         .filter(StringUtils::isNoneBlank)
                         .collect(Collectors.joining(","));
     }
@@ -55,7 +57,9 @@ public class QueryHelper {
             return "-" + field + ":*";
         }
 
-        return "{!q.op=OR}" + field + ":" +
+        return "{!q.op=OR}" + 
+                //NOTE: a NULL or blank field denotes to the configured 'df'
+                (StringUtils.isBlank(field) ? "" : (field + ":")) + 
                 Arrays.stream(values)
                         .map(ClientUtils::escapeQueryChars)
                         .collect(Collectors.joining(" ", "(", ")"));
