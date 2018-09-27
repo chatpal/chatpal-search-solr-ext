@@ -29,11 +29,12 @@ public class QueryHelper {
 
     /**
      * Builds a query that requires one of the parsed terms by using the Solr terms
-     * query parser
+     * query parser.
      * @param field the field. MUST NOT be <code>null</code> nor blank
      * @param values the values
      * @return the terms filter
      * @throws IllegalArgumentException if <code>null</code> or blank is parsed as field
+     * @see <a href="https://lucene.apache.org/solr/guide/7_2/other-parsers.html#terms-query-parser">https://lucene.apache.org/solr/guide/7_2/other-parsers.html#terms-query-parser</a>
      */
     public static String buildTermsQuery(String field, String[] values){
         if(StringUtils.isBlank(field)){
@@ -53,9 +54,9 @@ public class QueryHelper {
     /**
      * Builds a query that requires one of the parsed terms by using a normal solr
      * OR query
-     * @param field
-     * @param values
-     * @return
+     * @param field the field-name of the or query
+     * @param values the values to query for ({@code OR})
+     * @return field-query-string, connected with the {@code OR} operator
      */
     public static String buildOrFilter(String field, String[] values) {
         if (values == null || values.length < 1) {
@@ -64,7 +65,7 @@ public class QueryHelper {
 
         return "{!q.op=OR}" +
                 //NOTE: a NULL or blank field denotes to the configured 'df'
-                (StringUtils.isBlank(field) ? "" : (field + ":")) + 
+                (StringUtils.isBlank(field) ? "" : (field + ":")) +
                 Arrays.stream(values)
                         .filter(StringUtils::isNotBlank)
                         .map(ClientUtils::escapeQueryChars)
