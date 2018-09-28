@@ -9,9 +9,11 @@ jobs:
   - stage: sonarcloud
     jdk: openjdk8
     script:
+      - SONAR_BRANCH="${TRAVIS_BRANCH}"
+      - if [ "${TRAVIS_BRANCH}" == "${TRAVIS_TAG}" ]; then SONAR_BRANCH="master"; fi
       - mvn -B verify
         -Dsonar.login="${SONAR_TOKEN}"
-        -Dsonar.branch.name="${TRAVIS_BRANCH}"
+        -Dsonar.branch.name="${SONAR_BRANCH}"
 
 cache:
   directories:
