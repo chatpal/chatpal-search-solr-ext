@@ -18,10 +18,12 @@
 package io.chatpal.solr.ext.handler;
 
 import com.google.common.collect.ImmutableMap;
+import io.chatpal.solr.ext.ChatpalConfig;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
-import org.apache.solr.common.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -41,22 +43,40 @@ import java.util.stream.Stream;
 
 public class SuggestionRequestHandler extends SearchHandler {
 
+    private static final int DEFAULT_SUGGESTION_SIZE = 10;
+
     private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
     private ReportingLogger reporting = ReportingLogger.getInstance();
 
-    private static final int MAX_SIZE = 10;
+    private int suggestionsSize = DEFAULT_SUGGESTION_SIZE;
+
+    @Override
+    public void init(NamedList args) {
+        super.init(args);
+
+        if( args != null ) {
+            final Object size = args.get(ChatpalConfig.CONF_SUGGESTION_SIZE);
+            suggestionsSize = NumberUtils.toInt(String.valueOf(size), DEFAULT_SUGGESTION_SIZE);
+            if (suggestionsSize <= 0) {
+                logger.warn("Configured {} is less than 1, falling back to default {}",
+                        ChatpalConfig.CONF_SUGGESTION_SIZE, DEFAULT_SUGGESTION_SIZE);
+                suggestionsSize = DEFAULT_SUGGESTION_SIZE;
+            }
+        }
+    }
 
     @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
 
         long start = System.currentTimeMillis();
 
-        ModifiableSolrParams params = new ModifiableSolrParams();
+        final ModifiableSolrParams params = new ModifiableSolrParams();
 
         String text = req.getParams().get(ChatpalParams.PARAM_TEXT);
 
         if (StringUtils.isEmpty(text)) {
+            //noinspection unchecked
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, Collections.emptyList());
             return;
         }
@@ -69,13 +89,14 @@ public class SuggestionRequestHandler extends SearchHandler {
         params.set(FacetParams.FACET_LIMIT, 15);
 
         //set filter for type
-        String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
+        final String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
         if (typeParams != null) {
-            String types = String.join(" OR ", typeParams);
-            params.add(CommonParams.FQ, ChatpalParams.FIELD_TYPE + ":(" + types + ")");
+            params.add(CommonParams.FQ, QueryHelper.buildTermsQuery(ChatpalParams.FIELD_TYPE, typeParams));
         }
 
-        List<String> tokens = Stream.of(text.split(" ")).map(String::toLowerCase).collect(Collectors.toList());
+        final List<String> tokens = Stream.of(text.split("\\s+"))
+                .map(String::toLowerCase)
+                .collect(Collectors.toList());
 
         if (text.endsWith(" ")) {
             text = null;
@@ -88,24 +109,21 @@ public class SuggestionRequestHandler extends SearchHandler {
 
         appendACLFilter(params, req);
 
-        //logger.info("suggestion query: {}", params);
-
         try (LocalSolrQueryRequest userRequest = new LocalSolrQueryRequest(req.getCore(), params)) {
             final SolrQueryResponse response = new SolrQueryResponse();
 
             super.handleRequestBody(userRequest, response);
             //build response
-            Iterator<Map.Entry> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
+            //noinspection unchecked
+            final Iterator<Map.Entry<String, Object>> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
 
-            ArrayList<Map> suggestions = new ArrayList<>();
+            final List<Map> suggestions = new ArrayList<>();
 
-            String prefix = tokens.stream().collect(Collectors.joining(" "));
-
+            String prefix = String.join(" ", tokens);
             if (prefix.length() > 0) prefix += " ";
 
             while (entries.hasNext()) {
-
-                Map.Entry entry = entries.next();
+                final Map.Entry<String, Object> entry = entries.next();
                 if (!tokens.contains(entry.getKey())) {
                     suggestions.add(ImmutableMap.of(
                             "text", prefix + entry.getKey(),
@@ -113,9 +131,10 @@ public class SuggestionRequestHandler extends SearchHandler {
                     ));
                 }
 
-                if (suggestions.size() == MAX_SIZE) break;
+                if (suggestions.size() >= suggestionsSize) break;
             }
 
+            //noinspection unchecked
             rsp.getValues().add(ChatpalParams.FIELD_SUGGESTION, suggestions);
 
             reporting.logSuggestion(JsonLogMessage.suggestionLog()

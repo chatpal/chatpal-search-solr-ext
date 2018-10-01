@@ -17,29 +17,9 @@
 
 package io.chatpal.solr.ext;
 
-@SuppressWarnings("squid:S00115")
-public enum DocType {
-    Message("message"),
-    User("user"),
-    Room("room");
+public final class ChatpalConfig {
 
-    private final String key;
-    private final String indexVal;
+    public static final String CONF_SUGGESTION_SIZE = "suggestions.size";
 
-    DocType(String key) {
-        this(key, key);
-    }
-
-    DocType(String key, String indexVal) {
-        this.key = key;
-        this.indexVal = indexVal;
-    }
-
-    public String getKey() {
-        return key;
-    }
-
-    public String getIndexVal() {
-        return indexVal;
-    }
+    private ChatpalConfig() { }
 }
