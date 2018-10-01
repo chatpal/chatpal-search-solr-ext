@@ -4,8 +4,31 @@ jdk:
   - openjdk8
   - oraclejdk8
 
+jobs:
+  include:
+  - stage: sonarcloud
+    jdk: openjdk8
+    script:
+    - SONAR_PARAMS="";
+      if [ "${TRAVIS_PULL_REQUEST:-false}" != "false" ]; then
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.pullrequest.key=${TRAVIS_PULL_REQUEST}";
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.pullrequest.branch=${TRAVIS_PULL_REQUEST_BRANCH}";
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.pullrequest.base=${TRAVIS_BRANCH}";
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.pullrequest.provider=github";
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.pullrequest.github.repository=${TRAVIS_REPO_SLUG}";
+      elif [ -z "$TRAVIS_TAG" ]; then
+        SONAR_PARAMS="$SONAR_PARAMS -Dsonar.branch.name=${TRAVIS_BRANCH}";
+        if [ "${TRAVIS_BRANCH:-master}" != "master" ]; then
+          SONAR_PARAMS="$SONAR_PARAMS -Dsonar.branch.target=master";
+        fi;
+      fi;
+    - mvn -B verify
+      -Dsonar.login="${SONAR_TOKEN}"
+      $SONAR_PARAMS
+
 cache:
   directories:
   - $HOME/.m2
+  - $HOME/.sonar/cache
 before_cache:
-  - rm -rf $HOME/.m2/io/chatpal/solr/solr-ext/
+  - rm -rf $HOME/.m2/repository/io/chatpal/solr/solr-ext/
