@@ -25,7 +25,11 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
 import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.params.*;
+import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.DisMaxParams;
+import org.apache.solr.common.params.HighlightParams;
+import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.SearchHandler;
 import org.apache.solr.request.LocalSolrQueryRequest;
@@ -39,11 +43,15 @@ import org.apache.solr.search.DocList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Map;
 
 public class ChatpalSearchRequestHandler extends SearchHandler {
 
-    private Logger logger = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
 
     private ReportingLogger reporting = ReportingLogger.getInstance();
 
@@ -112,7 +120,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             query.set(CommonParams.Q, QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
         }
 
-        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT)); // TODO should sort be type aware?
+        // should sort be type aware?
+        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
 
@@ -140,7 +149,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 )
         );
 
-        logger.debug("Chatpal query: {}", defaultedQuery);
+        LOGGER.debug("Chatpal query: {}", defaultedQuery);
 
         try (LocalSolrQueryRequest subRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery)) {
             final SolrQueryResponse response = new SolrQueryResponse();
@@ -221,7 +230,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return result;
     }
 
-    private void inlineHighlighting(SolrDocument doc, NamedList<NamedList<Object>> highlighting, ResultContext rspContext, IndexSchema schema, String language) {
+    private void inlineHighlighting(SolrDocument doc, NamedList<NamedList<Object>> highlighting, ResultContext rspContext,
+                                    IndexSchema schema, String language) {
         if (highlighting == null) return;
 
         final String id = String.valueOf(getFirstValue(doc, schema.getUniqueKeyField()));

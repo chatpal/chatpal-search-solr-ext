@@ -37,7 +37,11 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -45,7 +49,7 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     private static final int DEFAULT_SUGGESTION_SIZE = 10;
 
-    private Logger logger = LoggerFactory.getLogger(SuggestionRequestHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
     private ReportingLogger reporting = ReportingLogger.getInstance();
 
@@ -59,7 +63,7 @@ public class SuggestionRequestHandler extends SearchHandler {
             final Object size = args.get(ChatpalConfig.CONF_SUGGESTION_SIZE);
             suggestionsSize = NumberUtils.toInt(String.valueOf(size), DEFAULT_SUGGESTION_SIZE);
             if (suggestionsSize <= 0) {
-                logger.warn("Configured {} is less than 1, falling back to default {}",
+                LOGGER.warn("Configured {} is less than 1, falling back to default {}",
                         ChatpalConfig.CONF_SUGGESTION_SIZE, DEFAULT_SUGGESTION_SIZE);
                 suggestionsSize = DEFAULT_SUGGESTION_SIZE;
             }
@@ -68,10 +72,8 @@ public class SuggestionRequestHandler extends SearchHandler {
 
     @Override
     public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
-
-        long start = System.currentTimeMillis();
-
-        final ModifiableSolrParams params = new ModifiableSolrParams();
+        @SuppressWarnings("squid:S1941")
+        final long start = System.currentTimeMillis();
 
         String text = req.getParams().get(ChatpalParams.PARAM_TEXT);
 
@@ -81,6 +83,7 @@ public class SuggestionRequestHandler extends SearchHandler {
             return;
         }
 
+        final ModifiableSolrParams params = new ModifiableSolrParams();
         params.set(CommonParams.Q, "*:*");
         params.set(CommonParams.ROWS, 0);
         params.set(FacetParams.FACET, true);
@@ -115,7 +118,13 @@ public class SuggestionRequestHandler extends SearchHandler {
             super.handleRequestBody(userRequest, response);
             //build response
             //noinspection unchecked
-            final Iterator<Map.Entry<String, Object>> entries = ((NamedList) ((SimpleOrderedMap) ((SimpleOrderedMap) response.getValues().get("facet_counts")).get("facet_fields")).get(ChatpalParams.FIELD_SUGGESTION)).iterator();
+            final Iterator<Map.Entry<String, Object>> entries =
+                    ((NamedList) (
+                            (SimpleOrderedMap) (
+                                    (SimpleOrderedMap) response.getValues().get("facet_counts")
+                            ).get("facet_fields")
+                    ).get(ChatpalParams.FIELD_SUGGESTION))
+                            .iterator();
 
             final List<Map> suggestions = new ArrayList<>();
 
