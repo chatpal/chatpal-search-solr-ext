@@ -34,11 +34,13 @@ import java.util.regex.Pattern;
 
 public class IdGenerationFieldUpdateProcessorFactory extends UpdateRequestProcessorFactory {
 
-    private static final String TARGET = "targetField", PATTERN = "pattern";
+    private static final String CONF_TARGET = "targetField";
+    private static final String CONF_PATTERN = "pattern";
 
     private static final Pattern REGEX = Pattern.compile("(?<!\\\\)\\{([^:}]+)(?::([^}]*))?}");
 
-    private String targetField, pattern;
+    private String targetField;
+    private String pattern;
 
     private boolean multiValued = false;
 
@@ -46,14 +48,14 @@ public class IdGenerationFieldUpdateProcessorFactory extends UpdateRequestProces
     public void init(NamedList args) {
         super.init(args);
 
-        targetField = Objects.toString(args.get(TARGET), null);
+        targetField = Objects.toString(args.get(CONF_TARGET), null);
         if (targetField == null) {
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Missing configuration: " + TARGET);
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Missing configuration: " + CONF_TARGET);
         }
 
-        pattern = Objects.toString(args.get(PATTERN), null);
+        pattern = Objects.toString(args.get(CONF_PATTERN), null);
         if (pattern == null) {
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Missing configuration: " + PATTERN);
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Missing configuration: " + CONF_PATTERN);
         }
     }
 
@@ -67,11 +69,11 @@ public class IdGenerationFieldUpdateProcessorFactory extends UpdateRequestProces
                     final Matcher matcher = REGEX.matcher(pattern);
                     final StringBuffer result = new StringBuffer();
                     while (matcher.find()) {
-                        final String g0 = matcher.group(),
-                                fName = matcher.group(1),
-                                fallback = StringUtils.defaultString(matcher.group(2), g0);
+                        final String g0 = matcher.group();
+                        final String fName = matcher.group(1);
+                        final String fallback = StringUtils.defaultString(matcher.group(2), g0);
 
-                        SolrInputField field = cmd.solrDoc.getField(fName);
+                        final SolrInputField field = cmd.solrDoc.getField(fName);
                         if (field != null) {
                             matcher.appendReplacement(result, String.valueOf(field.getFirstValue()));
                         } else {
