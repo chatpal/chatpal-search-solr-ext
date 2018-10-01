@@ -14,6 +14,7 @@
  * limitations under the License.
  *
  */
+
 package io.chatpal.solr.ext;
 
 import org.apache.solr.common.params.CommonParams;
@@ -35,7 +36,7 @@ public final class ChatpalParams {
     public static final String PARAM_TYPE = "type[]";
     public static final String PARAM_START = CommonParams.START;
     public static final String PARAM_ROWS = CommonParams.ROWS;
-    
+
     public static final String PARAM_EXCL_MSG = "excl.msg[]";
     public static final String PARAM_EXCL_ROOM = "excl.room[]";
 
