@@ -21,12 +21,15 @@ import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.DocType;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexableField;
 import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.params.*;
+import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.DisMaxParams;
+import org.apache.solr.common.params.HighlightParams;
+import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.SearchHandler;
 import org.apache.solr.request.LocalSolrQueryRequest;
@@ -40,11 +43,15 @@ import org.apache.solr.search.DocList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Map;
 
 public class ChatpalSearchRequestHandler extends SearchHandler {
 
-    private Logger logger = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
 
     private ReportingLogger reporting = ReportingLogger.getInstance();
 
@@ -66,6 +73,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         long start = System.currentTimeMillis();
 
         final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
+                this::setLanguageConfig,
+                this::setTimeRegressionBoost,
                 this::appendACLFilter,
                 this::appendExclusionFilter);
         final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
@@ -100,31 +109,19 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
-        //NOTES: 
+        //NOTES:
         // * the 'query' parameter overrides the 'text' parameter
         // * the 'text' parameter only allows for wildcards ('*' and '?')
-        String q = req.getParams().get(ChatpalParams.PARAM_QUERY);
+        final String q = req.getParams().get(ChatpalParams.PARAM_QUERY);
         if(q != null){ //explicit query parsed in request:
             query.set("defType", "lucene"); //deactivate edismax if a query is parsed
             query.set(CommonParams.Q, q);
-            if(docType == DocType.Message){
-                query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
-            } //else  use the default fields as configured in the solrconf.xml
         } else { //normal text query
             query.set(CommonParams.Q, QueryHelper.cleanTextQuery(req.getParams().get(ChatpalParams.PARAM_TEXT)));
-            if (docType == DocType.Message) {
-                query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
-                        .replaceAll("\\$\\{lang}", language));
-                query.add(HighlightParams.FIELDS, "text_${lang}"
-                        .replaceAll("\\$\\{lang}", language));
-                query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
-            } //else  use the qf as configured in the solrconfig.xml
         }
-        
-        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));//TODO should be type aware?
 
-        // TODO: Make this configurable
-
+        // should sort be type aware?
+        query.set(CommonParams.SORT, req.getParams().get(CommonParams.SORT));
 
         query.set(CommonParams.FQ, buildTypeFilter(docType));
 
@@ -152,7 +149,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 )
         );
 
-        logger.debug("Chatpal query: {}", defaultedQuery);
+        LOGGER.debug("Chatpal query: {}", defaultedQuery);
 
         try (LocalSolrQueryRequest subRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery)) {
             final SolrQueryResponse response = new SolrQueryResponse();
@@ -162,6 +159,30 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
             return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
+    }
+
+    @SuppressWarnings({"unused", "squid:S1172"})
+    private void setLanguageConfig(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
+        if (isParamSet(req, ChatpalParams.PARAM_QUERY)) {
+            query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
+        } else {
+            query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
+                    .replaceAll("\\$\\{lang}", language));
+            query.add(HighlightParams.FIELDS, "text_${lang}"
+                    .replaceAll("\\$\\{lang}", language));
+        }
+    }
+
+    @SuppressWarnings({"unused", "squid:S1172"})
+    private void setTimeRegressionBoost(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
+        if (!isParamSet(req, ChatpalParams.PARAM_QUERY)) {
+            query.set(DisMaxParams.BF, "recip(ms(NOW,updated),3.6e-11,3,1)");
+        }
+    }
+
+    private boolean isParamSet(SolrQueryRequest req, String param) {
+        return req.getParams().get(param) != null;
     }
 
     private boolean typeFilterAccepts(SolrQueryRequest req, DocType type) {
@@ -184,37 +205,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         while (documentIterator.hasNext()) {
             final SolrDocument doc = documentIterator.next();
 
-            if (highlighting != null) {
-                final String id = String.valueOf(getFirstValue(doc, schema.getUniqueKeyField()));
-                final NamedList<Object> highlights = highlighting.get(id);
-                if (highlights != null) {
-                    for (Map.Entry<String, Object> highlight : highlights) {
-                        final String fieldName = highlight.getKey();
-                        final Object fieldValue = highlight.getValue();
-
-                        final String targetField = StringUtils.removeEnd(fieldName, "_" + language);
-
-                        if (!rspContext.getReturnFields().wantsField(targetField)) continue;
-
-                        if (isMultiValueFiled(schema, targetField)) {
-                            doc.setField(targetField, fieldValue);
-                        } else if (fieldValue != null) {
-                            if (fieldValue.getClass().isArray()) {
-                                final Object firstVal = ((Object[]) fieldValue)[0];
-                                doc.setField(targetField, firstVal);
-                            } else if (fieldValue instanceof Collection) {
-                                Collection c = (Collection) fieldValue;
-                                if (!c.isEmpty()) {
-                                    doc.setField(targetField, c.iterator().next());
-                                }
-                            } else {
-                                doc.setField(targetField, fieldValue);
-                            }
-                        }
-
-                    }
-                }
-            }
+            inlineHighlighting(doc, highlighting, rspContext, schema, language);
 
             for (String fName : new HashSet<>(doc.getFieldNames())) {
                 if (!rspContext.getReturnFields().wantsField(fName)) {
@@ -239,6 +230,53 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return result;
     }
 
+    private void inlineHighlighting(SolrDocument doc, NamedList<NamedList<Object>> highlighting, ResultContext rspContext,
+                                    IndexSchema schema, String language) {
+        if (highlighting == null) return;
+
+        final String id = String.valueOf(getFirstValue(doc, schema.getUniqueKeyField()));
+        final NamedList<Object> highlights = highlighting.get(id);
+        if (highlights == null) return;
+
+        for (Map.Entry<String, Object> highlight : highlights) {
+            final String fieldName = highlight.getKey();
+            final Object fieldValue = highlight.getValue();
+
+            final String targetField = StringUtils.removeEnd(fieldName, "_" + language);
+
+            if (!rspContext.getReturnFields().wantsField(targetField)) continue;
+
+            if (isMultiValueFiled(schema, targetField)) {
+                doc.setField(targetField, fieldValue);
+            } else {
+                final Object firstVal = getFirstValue(fieldValue);
+                if (firstVal != null) {
+                    doc.setField(targetField, fieldValue);
+                }
+            }
+        }
+    }
+
+    private Object getFirstValue(Object fieldValue) {
+        if (fieldValue == null) {
+            return null;
+        } else if (fieldValue.getClass().isArray()) {
+            final Object[] arr = (Object[]) fieldValue;
+            if (arr.length > 0) {
+                return arr[0];
+            }
+        } else if (fieldValue instanceof Collection) {
+            final Collection c = (Collection) fieldValue;
+            if (!c.isEmpty()) {
+                return c.iterator().next();
+            }
+        } else {
+            return fieldValue;
+        }
+
+        return null;
+    }
+
     private boolean isMultiValueFiled(IndexSchema schema, String fieldName) {
         final SchemaField fieldOrNull = schema.getFieldOrNull(fieldName);
         return fieldOrNull == null || fieldOrNull.multiValued();
@@ -260,6 +298,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return ChatpalParams.FIELD_TYPE + ":" + type.getIndexVal();
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void appendACLFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         query.add(CommonParams.FQ, buildACLFilter(req.getParams()));
     }
@@ -268,6 +307,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
     }
 
+    @SuppressWarnings({"unused", "squid:S1172"})
     private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         final SolrParams params = req.getParams();
         if(docType == DocType.Message || docType == DocType.Room){
