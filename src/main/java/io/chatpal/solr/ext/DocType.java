@@ -21,7 +21,8 @@ package io.chatpal.solr.ext;
 public enum DocType {
     Message("message"),
     User("user"),
-    Room("room");
+    Room("room"),
+    File("file");
 
     private final String key;
     private final String indexVal;

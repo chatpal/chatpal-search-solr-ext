@@ -77,6 +77,10 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 this::setTimeRegressionBoost,
                 this::appendACLFilter,
                 this::appendExclusionFilter);
+        final Loggable fileLog = queryFor(DocType.File, originalReq, rsp,
+                this::setTimeRegressionBoost,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
         final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
                 this::appendACLFilter,
                 this::appendExclusionFilter);
@@ -90,12 +94,16 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             log.setResultSize(DocType.Message.getKey(), msgLog.numFound);
         }
 
+        if (fileLog != null) {
+            log.setResultSize(DocType.File.getKey(), fileLog.numFound);
+        }
+
         if (roomLog != null) {
-            log.setResultSize(DocType.Message.getKey(), roomLog.numFound);
+            log.setResultSize(DocType.Room.getKey(), roomLog.numFound);
         }
 
         if (userLog != null) {
-            log.setResultSize(DocType.Message.getKey(), userLog.numFound);
+            log.setResultSize(DocType.User.getKey(), userLog.numFound);
         }
 
         log.setQueryTime(System.currentTimeMillis() - start);
