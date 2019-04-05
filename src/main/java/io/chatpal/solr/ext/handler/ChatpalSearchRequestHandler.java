@@ -115,7 +115,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if (!typeFilterAccepts(req, docType)) return null;
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
-        final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
+        final String language = req.getParams().get(docType.equals(DocType.File) ? null : ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
         //NOTES:
         // * the 'query' parameter overrides the 'text' parameter
