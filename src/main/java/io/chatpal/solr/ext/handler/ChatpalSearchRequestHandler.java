@@ -147,16 +147,26 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             adapter.adaptQuery(query, req, rsp, docType);
         }
 
+        //we need the unique field to process inlineHighlighting
+        ModifiableSolrParams appendedParams = new ModifiableSolrParams();
+        if(req.getSchema().getUniqueKeyField() != null) {
+            appendedParams.add(CommonParams.FL, req.getSchema().getUniqueKeyField().getName());
+        }
+
         // param hierarchy
-        final SolrParams defaultedQuery = SolrParams.wrapDefaults(
-                // 1. req.getParams()
-                query,
-                SolrParams.wrapDefaults(
-                        // 2. [type].defaults
-                        defaultParams.get(docType),
-                        // 3. defaults
-                        defaults
-                )
+        final SolrParams defaultedQuery =
+                SolrParams.wrapAppended(
+                        SolrParams.wrapDefaults(
+                        // 1. req.getParams()
+                        query,
+                        SolrParams.wrapDefaults(
+                                // 2. [type].defaults
+                                defaultParams.get(docType),
+                                // 3. defaults
+                                defaults
+                        )
+                ),
+                appendedParams
         );
 
         LOGGER.debug("Chatpal query: {}", defaultedQuery);
@@ -222,6 +232,9 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                     doc.removeFields(fName);
                 }
             }
+
+            //do not return the internal uid field
+            doc.removeFields(schema.getUniqueKeyField().getName());
 
             docs.add(doc);
         }
