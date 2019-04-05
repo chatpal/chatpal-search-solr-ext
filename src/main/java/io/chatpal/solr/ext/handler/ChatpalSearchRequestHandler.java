@@ -108,7 +108,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
         final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
-
+        
         //NOTES:
         // * the 'query' parameter overrides the 'text' parameter
         // * the 'text' parameter only allows for wildcards ('*' and '?')
@@ -131,22 +131,32 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         query.set(CommonParams.ROWS, req.getParams()
                 .get(buildTypeParam(docType, ChatpalParams.PARAM_ROWS),
                         req.getParams().get(ChatpalParams.PARAM_ROWS)));
-
+        
         // Type specific adaptions
         for (QueryAdapter adapter : queryAdapter) {
             adapter.adaptQuery(query, req, rsp, docType);
         }
 
+        //we need the unique field to process inlineHighlighting
+        ModifiableSolrParams appendedParams = new ModifiableSolrParams();
+        if(req.getSchema().getUniqueKeyField() != null) {
+            appendedParams.add(CommonParams.FL, req.getSchema().getUniqueKeyField().getName());
+        }
+
         // param hierarchy
-        final SolrParams defaultedQuery = SolrParams.wrapDefaults(
-                // 1. req.getParams()
-                query,
-                SolrParams.wrapDefaults(
-                        // 2. [type].defaults
-                        defaultParams.get(docType),
-                        // 3. defaults
-                        defaults
-                )
+        final SolrParams defaultedQuery = 
+                SolrParams.wrapAppended(
+                        SolrParams.wrapDefaults(
+                        // 1. req.getParams()
+                        query,
+                        SolrParams.wrapDefaults(
+                                // 2. [type].defaults
+                                defaultParams.get(docType),
+                                // 3. defaults
+                                defaults
+                        )
+                ),
+                appendedParams
         );
 
         LOGGER.debug("Chatpal query: {}", defaultedQuery);
@@ -212,7 +222,10 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                     doc.removeFields(fName);
                 }
             }
-
+            
+            //do not return the internal uid field
+            doc.removeFields(schema.getUniqueKeyField().getName());
+            
             docs.add(doc);
         }
         result.add("docs", docs);
@@ -226,7 +239,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if (facets != null) {
             result.add("facets", facets);
         }
-
+        
         return result;
     }
 
