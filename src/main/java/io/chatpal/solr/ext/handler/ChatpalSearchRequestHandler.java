@@ -78,6 +78,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                 this::appendACLFilter,
                 this::appendExclusionFilter);
         final Loggable fileLog = queryFor(DocType.File, originalReq, rsp,
+                //file search does not use a language
+                (query, req, rsponse, docType) -> query.set(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE),
                 this::setTimeRegressionBoost,
                 this::appendACLFilter,
                 this::appendExclusionFilter);
@@ -115,7 +117,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if (!typeFilterAccepts(req, docType)) return null;
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
-        final String language = req.getParams().get(docType.equals(DocType.File) ? null : ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
+        final String reqLanguage = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
 
         //NOTES:
         // * the 'query' parameter overrides the 'text' parameter
@@ -162,8 +164,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         try (LocalSolrQueryRequest subRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery)) {
             final SolrQueryResponse response = new SolrQueryResponse();
             super.handleRequestBody(subRequest, response);
-
-            rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+            final String lang = subRequest.getParams().get(ChatpalParams.PARAM_LANG, reqLanguage);
+            rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, lang));
 
             return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
