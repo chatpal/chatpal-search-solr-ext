@@ -16,13 +16,13 @@
  */
 package io.chatpal.solr.ext.util;
 
-import org.apache.solr.core.SolrConfig;
+import org.apache.solr.core.Config;
 
 public final class SolrConfigUtils {
 
     private SolrConfigUtils() { }
 
-    public static long getLong(SolrConfig solrConfig, String path, long def) {
+    public static long getLong(Config solrConfig, String path, long def) {
         try {
             return Long.parseLong(solrConfig.get(path, String.valueOf(def)));
         } catch (NumberFormatException e) {
