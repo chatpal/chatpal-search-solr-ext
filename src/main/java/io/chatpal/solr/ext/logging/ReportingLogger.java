@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 public class ReportingLogger {
 
-    private final Logger logger = LoggerFactory.getLogger(Constants.REPORT_LOGGER);
+    private static final Logger LOGGER = LoggerFactory.getLogger(Constants.REPORT_LOGGER);
 
     public static ReportingLogger getInstance() {
         return new ReportingLogger();
@@ -50,6 +50,6 @@ public class ReportingLogger {
     }
 
     private void log(String jsonString) {
-        logger.info(jsonString);
+        LOGGER.info(jsonString);
     }
 }
