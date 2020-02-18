@@ -17,6 +17,7 @@
 
 package io.chatpal.solr.ext.handler;
 
+import io.chatpal.solr.ext.ChatpalApiConfig;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.DocType;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
@@ -31,6 +32,7 @@ import org.apache.solr.common.params.HighlightParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.component.SearchHandler;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
@@ -57,6 +59,15 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private Map<DocType, SolrParams> defaultParams = new EnumMap<>(DocType.class);
 
+    private ChatpalApiConfig apiConfig = new ChatpalApiConfig();
+
+    @Override
+    public void inform(SolrCore core) {
+        super.inform(core);
+
+        apiConfig = ChatpalApiConfig.fromSolrConfig(core.getSolrConfig());
+    }
+
     @Override
     public void init(NamedList args) {
         super.init(args);
@@ -71,37 +82,39 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     @Override
     public void handleRequestBody(SolrQueryRequest originalReq, SolrQueryResponse rsp) throws Exception {
         long start = System.currentTimeMillis();
+        final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
+                .setClient(originalReq.getCore().getName())
+                .setSearchTerm(originalReq.getParams().get(ChatpalParams.PARAM_TEXT));
 
         final Loggable msgLog = queryFor(DocType.Message, originalReq, rsp,
                 this::setLanguageConfig,
                 this::setTimeRegressionBoost,
                 this::appendACLFilter,
                 this::appendExclusionFilter);
-        final Loggable fileLog = queryFor(DocType.File, originalReq, rsp,
-                this::setTimeRegressionBoost,
-                this::appendACLFilter,
-                this::appendExclusionFilter);
-        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
-                this::appendACLFilter,
-                this::appendExclusionFilter);
-        final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
-
-        final JsonLogMessage.QueryLog log = JsonLogMessage.queryLog()
-                .setClient(originalReq.getCore().getName())
-                .setSearchTerm(originalReq.getParams().get(ChatpalParams.PARAM_TEXT));
-
         if (msgLog != null) {
             log.setResultSize(DocType.Message.getKey(), msgLog.numFound);
         }
 
-        if (fileLog != null) {
-            log.setResultSize(DocType.File.getKey(), fileLog.numFound);
+        if (apiConfig.getFileSearch().isEnabled()) {
+            final Loggable fileLog = queryFor(DocType.File, originalReq, rsp,
+                    //file search does not use a language
+                    (query, req, rsponse, docType) -> query.set(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE),
+                    this::setTimeRegressionBoost,
+                    this::appendACLFilter,
+                    this::appendExclusionFilter);
+            if (fileLog != null) {
+                log.setResultSize(DocType.File.getKey(), fileLog.numFound);
+            }
         }
 
+        final Loggable roomLog = queryFor(DocType.Room, originalReq, rsp,
+                this::appendACLFilter,
+                this::appendExclusionFilter);
         if (roomLog != null) {
             log.setResultSize(DocType.Room.getKey(), roomLog.numFound);
         }
 
+        final Loggable userLog = queryFor(DocType.User, originalReq, rsp);
         if (userLog != null) {
             log.setResultSize(DocType.User.getKey(), userLog.numFound);
         }
@@ -115,8 +128,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if (!typeFilterAccepts(req, docType)) return null;
 
         final ModifiableSolrParams query = new ModifiableSolrParams();
-        final String language = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
-        
+        final String reqLanguage = req.getParams().get(ChatpalParams.PARAM_LANG, ChatpalParams.LANG_NONE);
+
         //NOTES:
         // * the 'query' parameter overrides the 'text' parameter
         // * the 'text' parameter only allows for wildcards ('*' and '?')
@@ -139,7 +152,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         query.set(CommonParams.ROWS, req.getParams()
                 .get(buildTypeParam(docType, ChatpalParams.PARAM_ROWS),
                         req.getParams().get(ChatpalParams.PARAM_ROWS)));
-        
+
         // Type specific adaptions
         for (QueryAdapter adapter : queryAdapter) {
             adapter.adaptQuery(query, req, rsp, docType);
@@ -152,7 +165,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         }
 
         // param hierarchy
-        final SolrParams defaultedQuery = 
+        final SolrParams defaultedQuery =
                 SolrParams.wrapAppended(
                         SolrParams.wrapDefaults(
                         // 1. req.getParams()
@@ -172,8 +185,8 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         try (LocalSolrQueryRequest subRequest = new LocalSolrQueryRequest(req.getCore(), defaultedQuery)) {
             final SolrQueryResponse response = new SolrQueryResponse();
             super.handleRequestBody(subRequest, response);
-
-            rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, language));
+            final String lang = subRequest.getParams().get(ChatpalParams.PARAM_LANG, reqLanguage);
+            rsp.add(docType.getKey(), materializeResult(req.getSchema(), response, lang));
 
             return new Loggable(((ResultContext) response.getResponse()).getDocList().matches());
         }
@@ -230,10 +243,10 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
                     doc.removeFields(fName);
                 }
             }
-            
+
             //do not return the internal uid field
             doc.removeFields(schema.getUniqueKeyField().getName());
-            
+
             docs.add(doc);
         }
         result.add("docs", docs);
@@ -247,7 +260,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
         if (facets != null) {
             result.add("facets", facets);
         }
-        
+
         return result;
     }
 
