@@ -55,9 +55,9 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatpalSearchRequestHandler.class);
 
-    private ReportingLogger reporting = ReportingLogger.getInstance();
+    private final ReportingLogger reporting = ReportingLogger.getInstance();
 
-    private Map<DocType, SolrParams> defaultParams = new EnumMap<>(DocType.class);
+    private final Map<DocType, SolrParams> defaultParams = new EnumMap<>(DocType.class);
 
     private ChatpalApiConfig apiConfig = new ChatpalApiConfig();
 
@@ -199,9 +199,9 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
             query.set(CommonParams.DF, "text_"+language); //use the text_{lang} field as default field
         } else {
             query.set(DisMaxParams.QF, "context^2 text_${lang}^1 decompose_text_${lang}^.5"
-                    .replaceAll("\\$\\{lang}", language));
+                    .replace("${lang}", language));
             query.add(HighlightParams.FIELDS, "text_${lang}"
-                    .replaceAll("\\$\\{lang}", language));
+                    .replace("${lang}", language));
         }
     }
 
@@ -217,7 +217,7 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     }
 
     private boolean typeFilterAccepts(SolrQueryRequest req, DocType type) {
-        final String[] types = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
+        final String[] types = QueryHelper.getMultiValueParam(ChatpalParams.PARAM_TYPE, req.getParams());
         return ArrayUtils.isEmpty(types) || ArrayUtils.contains(types, type.getKey());
     }
 
@@ -338,20 +338,20 @@ public class ChatpalSearchRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, QueryHelper.getMultiValueParam(ChatpalParams.PARAM_ACL, params));
     }
 
     @SuppressWarnings({"unused", "squid:S1172"})
     private void appendExclusionFilter(ModifiableSolrParams query, SolrQueryRequest req, SolrQueryResponse rsp, DocType docType) {
         final SolrParams params = req.getParams();
         if(docType == DocType.Message || docType == DocType.Room){
-            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, params.getParams(ChatpalParams.PARAM_EXCL_ROOM));
+            String exclRoomFilter = buildExclusionFilter(ChatpalParams.FIELD_ROOM_ID, QueryHelper.getMultiValueParam(ChatpalParams.PARAM_EXCL_ROOM, params));
             if(StringUtils.isNotBlank(exclRoomFilter)){
                 query.add(CommonParams.FQ, exclRoomFilter);
             }
         }
         if(docType == DocType.Message){
-            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, params.getParams(ChatpalParams.PARAM_EXCL_MSG));
+            String exclMsgFilter = buildExclusionFilter(ChatpalParams.FIELD_MSG_ID, QueryHelper.getMultiValueParam(ChatpalParams.PARAM_EXCL_MSG, params));
             if(StringUtils.isNotBlank(exclMsgFilter)){
                 query.add(CommonParams.FQ, exclMsgFilter);
             }

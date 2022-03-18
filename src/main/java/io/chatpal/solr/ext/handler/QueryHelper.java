@@ -24,6 +24,7 @@ import io.chatpal.solr.ext.ChatpalParams;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.apache.solr.common.params.SolrParams;
 
 public class QueryHelper {
 
@@ -115,4 +116,23 @@ public class QueryHelper {
         return sb.toString();
     }
 
+    /**
+     * Retrieve values of multivalued params, checking different serialization-formats.
+     * Serialization was changed recently from "php-style" to "non-exploded form".
+     * @param paramName the parameter key (without the []-suffix)
+     * @param solrParams the {@link SolrParams} to read from
+     * @return the parameter-values in an array.
+     */
+    public static String[] getMultiValueParam(String paramName, SolrParams solrParams) {
+        // New format "param=value1,value2,value3
+        final String[] values = solrParams.getParams(paramName);
+        if (values != null) {
+            return Arrays.stream(values)
+                    .flatMap(e -> Arrays.stream(e.split(",")))
+                    .toArray(String[]::new)
+            ;
+        }
+        // Fallback to legacy format param[]=value1&param[]=value2&param[]=value3
+        return solrParams.getParams(paramName + ChatpalParams.LEGACY_PARAM_SUFFIX);
+    }
 }

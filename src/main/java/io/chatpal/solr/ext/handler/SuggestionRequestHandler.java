@@ -22,6 +22,13 @@ import io.chatpal.solr.ext.ChatpalConfig;
 import io.chatpal.solr.ext.ChatpalParams;
 import io.chatpal.solr.ext.logging.JsonLogMessage;
 import io.chatpal.solr.ext.logging.ReportingLogger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.solr.common.params.CommonParams;
@@ -37,21 +44,14 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 public class SuggestionRequestHandler extends SearchHandler {
 
     private static final int DEFAULT_SUGGESTION_SIZE = 10;
+    private static final Pattern WHITE_SPACE_SPLIT = Pattern.compile("\\s+");
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SuggestionRequestHandler.class);
 
-    private ReportingLogger reporting = ReportingLogger.getInstance();
+    private final ReportingLogger reporting = ReportingLogger.getInstance();
 
     private int suggestionsSize = DEFAULT_SUGGESTION_SIZE;
 
@@ -92,12 +92,12 @@ public class SuggestionRequestHandler extends SearchHandler {
         params.set(FacetParams.FACET_LIMIT, 15);
 
         //set filter for type
-        final String[] typeParams = req.getParams().getParams(ChatpalParams.PARAM_TYPE);
+        final String[] typeParams = QueryHelper.getMultiValueParam(ChatpalParams.PARAM_TYPE, req.getParams());
         if (typeParams != null) {
             params.add(CommonParams.FQ, QueryHelper.buildTermsQuery(ChatpalParams.FIELD_TYPE, typeParams));
         }
 
-        final List<String> tokens = Stream.of(text.split("\\s+"))
+        final List<String> tokens = WHITE_SPACE_SPLIT.splitAsStream(text)
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
 
@@ -158,7 +158,7 @@ public class SuggestionRequestHandler extends SearchHandler {
     }
 
     private String buildACLFilter(SolrParams params) {
-        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, params.getParams(ChatpalParams.PARAM_ACL));
+        return QueryHelper.buildTermsQuery(ChatpalParams.FIELD_ACL, QueryHelper.getMultiValueParam(ChatpalParams.PARAM_ACL, params));
     }
 
 }
