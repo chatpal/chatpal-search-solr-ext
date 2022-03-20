@@ -32,13 +32,13 @@
 
     <organization>
         <name>Redlink GmbH</name>
-        <url>https://redlink.co/</url>
+        <url>https://redlink.at/</url>
     </organization>
 
     <licenses>
         <license>
             <name>The Apache Software License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
             <distribution>repo</distribution>
             <comments>A business-friendly OSS license</comments>
         </license>
@@ -48,19 +48,19 @@
         <developer>
             <id>tkurz</id>
             <name>Thomas Kurz</name>
-            <email>thomas.kurz@redlink.co</email>
+            <email>thomas.kurz@redlink.at</email>
             <organization>Redlink GmbH</organization>
         </developer>
         <developer>
             <id>ja-fra</id>
             <name>Jakob Frank</name>
-            <email>jakob.frank@redlink.co</email>
+            <email>jakob.frank@redlink.at</email>
             <organization>Redlink GmbH</organization>
         </developer>
         <developer>
             <id>westei</id>
             <name>Rupert Westenthaler</name>
-            <email>rupert.westenthaler@redlink.co</email>
+            <email>rupert.westenthaler@redlink.at</email>
             <organization>Redlink GmbH</organization>
         </developer>
     </developers>
