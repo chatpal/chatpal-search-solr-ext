@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Redlink GmbH
+ * Copyright (c) 2018-2022 Redlink GmbH.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,10 @@ package io.chatpal.solr.ext.handler;
 import io.chatpal.solr.ext.ChatpalParams;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.params.SolrParams;
 import org.hamcrest.CoreMatchers;
-import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class QueryHelperTest {
 
